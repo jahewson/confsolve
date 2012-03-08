@@ -2,4 +2,7 @@
 *.userprefs
 ConfSolveSemantics/ConfSolveSemantics/bin
 ConfSolveSemantics/ConfSolveSemantics/obj
-ConfSolveSemantics/ConfSolveSemantics/*.fs*
+ConfSolveSemantics/ConfSolveSemantics/*.fs
+ConfSolveSemantics/ConfSolveSemantics/*.fsi
+ConfSolveSemantics/ConfSolveSemantics/*.fsl
+ConfSolveSemantics/ConfSolveSemantics/*.fsy
