@@ -1,4 +1,5 @@
-#!/user/bin/sh
+#!/bin/sh
+# the F# is automatically generated from the OCaml source
 set -e
 cd ConfSolveSemantics/ConfSolveSemantics
 ../../ocaml-to-fsharp
