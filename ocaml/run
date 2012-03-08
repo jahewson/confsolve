@@ -1,0 +1,30 @@
+#!/user/bin/sh
+set -e
+
+mkdir -p bin
+cd bin
+cp ../src/*.ml* ./
+
+ocamlc -c ConfSolve.mli
+ocamlc -c ConfSolve.ml
+
+ocamlc -c Debug.mli
+ocamlc -c Debug.ml
+
+ocamlyacc Parser.mly
+ocamlc -c Parser.mli
+ocamlc -c Parser.ml
+
+ocamllex -q Lexer.mll
+ocamlc -c Lexer.ml
+
+ocamlc -c Semantics.mli
+ocamlc -c Semantics.ml
+
+ocamlc -c Program.ml
+
+ocamlc -o confsolve-semantics-bytecode ConfSolve.cmo Debug.cmo Parser.cmo Lexer.cmo Semantics.cmo Program.cmo
+
+rm *.ml*
+
+./confsolve-semantics-bytecode %*

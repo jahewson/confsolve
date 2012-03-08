@@ -1,0 +1,5 @@
+*.suo
+*.userprefs
+ConfSolveSemantics/ConfSolveSemantics/bin
+ConfSolveSemantics/ConfSolveSemantics/obj
+ConfSolveSemantics/ConfSolveSemantics/*.fs*

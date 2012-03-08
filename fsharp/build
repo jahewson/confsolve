@@ -1,0 +1,7 @@
+#!/user/bin/sh
+set -e
+cd ConfSolveSemantics/ConfSolveSemantics
+../../ocaml-to-fsharp
+fsyacc Parser.fsy --module Parser
+fslex Lexer.fsl --unicode
+fsc2 --nologo ConfSolve.fs Semantics.fs Parser.fs Lexer.fs Program.fs -r FSharp.PowerPack.dll -o bin/Debug/ConfSolveSemantics.exe

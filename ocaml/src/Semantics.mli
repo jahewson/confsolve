@@ -1,0 +1,1 @@
+val toMiniZinc : ConfSolve.model -> string

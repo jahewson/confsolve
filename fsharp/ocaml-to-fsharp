@@ -1,0 +1,89 @@
+#!/usr/bin/env node
+// script for node.js >= 0.6.11
+
+var fs = require('fs'),
+    path = require('path');
+
+var files = ['ConfSolve.ml', 'Lexer.mll', 'Parser.mly', 'Semantics.ml', 'Program.ml'];
+var types = {};
+
+files.forEach(function(filename) {
+  var code = fs.readFileSync('../../../ocaml/src/' + filename, 'ascii');
+  var basename = filename.substr(0, filename.indexOf('.'));
+  var fsname = filename.replace('.ml', '.fs');
+  
+  // type declarations
+  var re = /(type\s+)([\w_]+)(.*)/g;
+  var res;
+  do {
+    res = re.exec(code);
+    if (res != null) {
+      var name = res[2];
+      if (name[0] == '_') {
+        name = name.substr(1);
+      }
+      name = name.substr(0,1).toUpperCase() + name.substr(1);
+      types[res[2]] = name;
+    }
+  } while(res != null)
+
+  // type usage
+  for (var t in types) {
+    code = code.replace(new RegExp('\\b' + t + '\\b', 'g'), types[t]);
+    code = code.replace(new RegExp('<' + t + '>', 'g'), types[t]); // fsyacc
+  }
+
+  // comments
+  code = code.replace(/(\(\*)(.*)(\*\) *)/g, '// $2');
+  code = code.replace(/(\(\*)(.*)(\*\))/gm, '/* $2 */');
+  
+  // pre-processor
+  code = code.replace(/(^#)(.*)($)/gm, '(* #$2 *)\n');
+
+  // line-end semicolons
+  code = code.replace(/;+$/gm, '');
+  
+  // strings
+  code = code.replace(/\^/g, '+');
+  code = code.replace(/string_of_int/g, 'string');
+  code = code.replace(/int_of_string/g, 'Int32.Parse');
+  
+  // list
+  code = code.replace(/List\.fold_left/g, 'List.fold');
+  
+  // print
+  code = code.replace(/Std.print/g, 'printfn "%A"');
+  code = code.replace(/Printf\.printf/g, 'printf');
+  code = code.replace(/print_endline/g, 'printfn "%s"');
+  code = code.replace(/print_int/g, 'printf "%d"');
+  code = code.replace(/print_string/g, 'printf "%s"');
+  code = code.replace(/print_newline\(\)/g, 'printf "\\n"');
+  code = code.replace(/flush stdout/g, 'stdout.Flush');
+  code = code.replace(/Debug.printn/g, 'printfn "%A"');
+  code = code.replace(/Debug.print/g, 'printf "%A"');
+  
+  // let
+  code = code.replace(/( in)(\s)/gm, '$2');
+
+  // fslex
+  code = code.replace(/^%Token/mg, '%token');
+  if (path.extname(filename) == '.mll') {
+    code = code.replace(/open Parser/, 'module Lexer\nopen System\nopen Parser');
+  }
+  
+  if (filename == 'Lexer.mll') {
+    code = code.replace(/open Lexing/, 
+        'open Microsoft.FSharp.Text.Lexing\nlet lexeme = Lexing.LexBuffer<_>.LexemeString');
+  }
+  code = code.replace(/Lexing.from_channel/g, 'Lexing.LexBuffer<char>.FromTextReader');
+  code = code.replace(/Lexing.from_string/g, 'Lexing.LexBuffer<char>.FromString');
+  code = code.replace(/open Lexing/, 'open Microsoft.FSharp.Text.Lexing');
+
+  // modules
+  if (filename != 'Program.ml' && filename.slice(-3) == '.ml') {
+    code = 'module ' + basename + '\n\n' + code;
+  }
+  code = code.replace(/open Debug$/m, '');
+
+  fs.writeFileSync(fsname, code);
+});

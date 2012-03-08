@@ -1,0 +1,2 @@
+#!/user/bin/sh
+mono ConfSolveSemantics/ConfSolveSemantics/bin/Debug/ConfSolveSemantics.exe $*
