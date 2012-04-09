@@ -1,1 +1,1 @@
-val toMiniZinc : ConfSolve.model -> string
+val toMiniZinc : ConfSolve.model -> bool -> bool -> string

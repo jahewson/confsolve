@@ -1,3 +1,5 @@
+module StrMap = Map.Make(String)
+
 type className = string
 type fieldName = string
 type varName = string
@@ -9,25 +11,34 @@ type _type =
   (* enum *)
   | T_Class of className
   | T_Ref of className
-  (* set *)
-  
+  | T_Set of _type * int * int (* lbound, ubound *)
+
 type op =
   | Eq | Neq | Gt | Ge | Lt | Le | In | Subset
   | Union | Intersection
   | And | Or | Implies | Iff
   | Add | Sub | Div | Mul | Pow | Mod
 
+type foldOp =
+  | ForAll
+  | Exists
+  | Sum
+
 type expr =
   | E_Var of varName
-  | E_FieldAccess of expr * fieldName
+  | E_Access of expr * fieldName
   (* ... *)
   | E_Op of expr * op * expr
+  (* ... *)
+  | E_Card of expr (* e.size *)
+  | E_Fold of foldOp * varName * expr * expr * expr (* collection, where, body *)
   (* ... *)
   | E_Neg of expr 
   | E_Not of expr
   | E_Bool of bool
   | E_Int of int
-  
+  | E_Paren of expr
+
 type _constraint =
   | C_Where of expr
   | C_Maximise of expr

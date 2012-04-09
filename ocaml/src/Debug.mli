@@ -1,2 +1,2 @@
-val print : ConfSolve.model -> unit
-val printn : ConfSolve.model -> unit
+val printAst : ConfSolve.model -> unit
+val printToken : Parser.token -> unit

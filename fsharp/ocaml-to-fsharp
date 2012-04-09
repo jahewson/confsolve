@@ -13,7 +13,7 @@ files.forEach(function(filename) {
   var fsname = filename.replace('.ml', '.fs');
   
   // type declarations
-  var re = /(type\s+)([\w_]+)(.*)/g;
+  /*var re = /(type\s+)([\w_]+)(.*)/g;
   var res;
   do {
     res = re.exec(code);
@@ -22,31 +22,41 @@ files.forEach(function(filename) {
       if (name[0] == '_') {
         name = name.substr(1);
       }
-      name = name.substr(0,1).toUpperCase() + name.substr(1);
+      if (name != "of") {
+        name = name.substr(0,1).toUpperCase() + name.substr(1);
+      }
       types[res[2]] = name;
     }
   } while(res != null)
 
   // type usage
   for (var t in types) {
-    code = code.replace(new RegExp('\\b' + t + '\\b', 'g'), types[t]);
-    code = code.replace(new RegExp('<' + t + '>', 'g'), types[t]); // fsyacc
-  }
+    var r = '(\\b' + t + ')([\\s\\n;>])';
+    console.log(r);
+    code = code.replace(new RegExp(r, 'g'), types[t] + '$2');
+    code = code.replace(new RegExp('<' + t + '>', 'g'), '<' + types[t] + '>'); // fsyacc
+  }*/
+  
+  // NEW: upper case types
+  code = code.replace(/Lexing\.position/g, "Lexing.Position")
 
   // comments
-  code = code.replace(/(\(\*)(.*)(\*\) *)/g, '// $2');
+  code = code.replace(/(\(\*)([^\n]*)(\*\) *)/gm, '// $2');
   code = code.replace(/(\(\*)(.*)(\*\))/gm, '/* $2 */');
   
   // pre-processor
   code = code.replace(/(^#)(.*)($)/gm, '(* #$2 *)\n');
 
   // line-end semicolons
-  code = code.replace(/;+$/gm, '');
+  //code = code.replace(/;+$/gm, '');
+  code = code.replace(/;;$/gm, ''); // only 2xSemicolons
   
   // strings
   code = code.replace(/\^/g, '+');
   code = code.replace(/string_of_int/g, 'string');
   code = code.replace(/int_of_string/g, 'Int32.Parse');
+  code = code.replace(/int_of_bool/g, 'Bool.Parse');
+  code = code.replace(/string_of_bool/g, 'string');
   
   // list
   code = code.replace(/List\.fold_left/g, 'List.fold');
@@ -59,12 +69,27 @@ files.forEach(function(filename) {
   code = code.replace(/print_string/g, 'printf "%s"');
   code = code.replace(/print_newline\(\)/g, 'printf "\\n"');
   code = code.replace(/flush stdout/g, 'stdout.Flush');
-  code = code.replace(/Debug.printn/g, 'printfn "%A"');
-  code = code.replace(/Debug.print/g, 'printf "%A"');
+  code = code.replace(/Debug.printAst/g, 'printfn "%A"');
+  code = code.replace(/Debug.printToken/g, 'printfn "%A"');
+  
+  // exceptions
+  code = code.replace(/Not_found/, ':? System.IndexOutOfRangeException');
+  
+  // Map
+  code = code.replace(/module StrMap = .*/, "");
+  code = code.replace(/StrMap\.mem/g, "Map.containsKey");
+  code = code.replace(/int StrMap\.t/g, "Map<string,int>");
+  code = code.replace(/StrMap/g, "Map");  // last!
   
   // let
-  code = code.replace(/( in)(\s)/gm, '$2');
-
+  code = code.replace(/( in)(\s*$)/gm, '$2');
+  
+  // file i/o
+  if (filename == 'Program.ml') {
+    code = 'open System.IO\n' + code;
+  }
+  code = code.replace(/open_in\b/g, 'File.OpenText');
+  
   // fslex
   code = code.replace(/^%Token/mg, '%token');
   if (path.extname(filename) == '.mll') {
@@ -73,17 +98,25 @@ files.forEach(function(filename) {
   
   if (filename == 'Lexer.mll') {
     code = code.replace(/open Lexing/, 
-        'open Microsoft.FSharp.Text.Lexing\nlet lexeme = Lexing.LexBuffer<_>.LexemeString');
+        'open Microsoft.FSharp.Text.Lexing\n' +
+        'let lexeme = Lexing.LexBuffer<_>.LexemeString\n' +
+        'let lexeme_start_p (lexbuf : Lexing.LexBuffer<_>) = lexbuf.StartPos');
   }
   code = code.replace(/Lexing.from_channel/g, 'Lexing.LexBuffer<char>.FromTextReader');
   code = code.replace(/Lexing.from_string/g, 'Lexing.LexBuffer<char>.FromString');
   code = code.replace(/open Lexing/, 'open Microsoft.FSharp.Text.Lexing');
+  code = code.replace('Lexing.lexeme_start_p', 'lexeme_start_p');
 
   // modules
   if (filename != 'Program.ml' && filename.slice(-3) == '.ml') {
     code = 'module ' + basename + '\n\n' + code;
   }
   code = code.replace(/open Debug$/m, '');
+  
+
+  
+  // multiple empty lines
+  code = code.replace(/\r\n(\r\n)+/gm, "\r\n\r\n");
 
   fs.writeFileSync(fsname, code);
 });

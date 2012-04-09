@@ -5,6 +5,7 @@ mkdir -p bin
 cd bin
 cp ../src/*.ml* ./
 
+ocamlc -i ConfSolve.ml > ConfSolve.mli
 ocamlc -c ConfSolve.mli
 ocamlc -c ConfSolve.ml
 

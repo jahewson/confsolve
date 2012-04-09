@@ -4,46 +4,50 @@ open Parser;;
 open ConfSolve;;
 open Semantics;;
 open Debug;;
+open Printf;;
 
-let main () =
-  let c = G_Class { name="C"; super=None; members=[M_Var ("V2", T_Int); M_Var ("V3", T_Class("C2"))] } in
-  let v = G_Var ("V", T_Bool) in
-  let v4 = G_Var ("V4", T_Class("C2")) in
-  let example = { declarations=[c; v; v4]  } in
-  Debug.printn example;
-  let mz = Semantics.toMiniZinc(example) in
-  print_endline mz;;
-  
-let rec printTokens (lexbuf) = 
-  let tkn = Lexer.token lexbuf in
-  match tkn with
-  | VAR -> print_string "VAR\n"; printTokens lexbuf
-  | AS -> print_string "AS\n"; printTokens lexbuf
-  | INT -> print_string "INT\n"; printTokens lexbuf
-  | IDENTIFIER(id) -> print_string("IDENTIFIER \"" ^ id ^ "\"\n"); printTokens lexbuf
+module StrMap = Map.Make(String);;
+
+(* for debugging *)
+let rec printTokens (lexbuf) =
+  let t = Lexer.token lexbuf in
+  match t with
   | EOF -> print_string("EOF\n")
-  | SEMICOLON -> print_string("SEMICOLON\n"); printTokens lexbuf
-  | _ -> print_string "todo...\n"; printTokens lexbuf
-      
-let new_parse () =
-  let code = "var x as int; var y as int" in
+  | _ -> Debug.printToken t; printTokens lexbuf
   
-  (* tokens *)
-  let lexbuf = Lexing.from_string code in
-  printTokens lexbuf;
-
-  print_string "-------------------\n";
+(* parses command-line args imperatively *)
+let main () =
+  let (filename, showTokens, showAst, showCounting, hasComments) = 
+      ((ref ""), (ref false), (ref false), (ref false), (ref false)) 
+  in
+  let arglist = [
+    ("-c", Arg.Set hasComments, "comment the MiniZinc");
+    (*("-o", Arg.Set_string filename, "output filename")*) (* TODO *)
+    ("--debug-tokens", Arg.Set showTokens, "print lexer tokens (debug)");
+    ("--debug-ast", Arg.Set showAst, "print AST (debug)");
+    ("--debug-counting", Arg.Set showCounting, "print object count (debug)")] 
+  in
+  let msg = "usage: filename [options]" in
+  let _ = (Arg.parse arglist (fun s ->
+      if String.length !filename = 0 then
+        filename := s
+      else
+        raise (Arg.Bad (sprintf "unexpected argument '%s'" s))
+      ) msg)
+  in
+  if String.length !filename = 0 then
+    (Arg.usage arglist msg;
+    exit 1)
+  else
+    let lexbuf = Lexing.from_channel (open_in "test.spec") in
+    if !showTokens then
+      printTokens lexbuf
+    else
+      let ast = Parser.model Lexer.token lexbuf in
+      if !showAst then
+        Debug.printAst ast
+      else
+        let mz = Semantics.toMiniZinc ast !showCounting !hasComments in
+        print_endline mz;;
   
-  (* parse *)
-  let lexbuf2 = Lexing.from_string code in
-  let model = Parser.model Lexer.token lexbuf2 in
-  Debug.printn model;
-  
-  print_string "-------------------\n";
-  
-  (* semantics *)
-  let mz = Semantics.toMiniZinc model in
-  print_endline mz;;
-  
-(* main();; *)
-new_parse();;
+main();;

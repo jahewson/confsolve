@@ -1,8 +1,9 @@
 #!/bin/sh
 # the F# is automatically generated from the OCaml source
-set -e
+set -e -x
 cd ConfSolveSemantics/ConfSolveSemantics
+cp ../../../ocaml/src/*.spec bin/Debug
 ../../ocaml-to-fsharp
 fsyacc Parser.fsy --module Parser
 fslex Lexer.fsl --unicode
-fsc2 --nologo ConfSolve.fs Semantics.fs Parser.fs Lexer.fs Program.fs -r FSharp.PowerPack.dll -o bin/Debug/ConfSolveSemantics.exe
+fsc2 --nowarn:62 --nologo ConfSolve.fs Semantics.fs Parser.fs Lexer.fs Program.fs -r FSharp.PowerPack.dll -r FSharp.PowerPack.Compatibility.dll -o bin/Debug/ConfSolveSemantics.exe

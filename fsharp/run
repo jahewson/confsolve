@@ -1,2 +1,3 @@
 #!/bin/sh
-mono ConfSolveSemantics/ConfSolveSemantics/bin/Debug/ConfSolveSemantics.exe $*
+cd ConfSolveSemantics/ConfSolveSemantics/bin/Debug
+mono ConfSolveSemantics.exe $*

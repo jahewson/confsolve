@@ -4,19 +4,21 @@ set -e
 mkdir -p bin
 cd bin
 cp ../src/*.ml* ./
+cp ../src/*.spec* ./
 
+ocamlc -i ConfSolve.ml > ConfSolve.mli
 ocamlc -c ConfSolve.mli
 ocamlc -c ConfSolve.ml
 
-ocamlc -c Debug.mli
-ocamlc -c Debug.ml
-
-ocamlyacc Parser.mly
+ocamlyacc -v Parser.mly
 ocamlc -c Parser.mli
 ocamlc -c Parser.ml
 
 ocamllex -q Lexer.mll
 ocamlc -c Lexer.ml
+
+ocamlc -c Debug.mli
+ocamlc -c Debug.ml
 
 ocamlc -c Semantics.mli
 ocamlc -c Semantics.ml
@@ -27,4 +29,4 @@ ocamlc -o confsolve-semantics-bytecode ConfSolve.cmo Debug.cmo Parser.cmo Lexer.
 
 rm *.ml*
 
-./confsolve-semantics-bytecode %*
+./confsolve-semantics-bytecode $*
