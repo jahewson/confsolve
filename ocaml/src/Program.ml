@@ -39,7 +39,7 @@ let main () =
     (Arg.usage arglist msg;
     exit 1)
   else
-    let lexbuf = Lexing.from_channel (open_in "test.spec") in
+    let lexbuf = Lexing.from_channel (open_in !filename) in
     if !showTokens then
       printTokens lexbuf
     else
