@@ -2,7 +2,7 @@
 set -e
 
 cd bin
-./confsolve-semantics-bytecode %* > test.mzn
+./confsolve-semantics-bytecode $* > test.mzn
 mzn2fzn --no-output-ozn test.mzn
 echo "solving..."
 fz test.fzn
