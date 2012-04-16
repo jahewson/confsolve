@@ -215,6 +215,12 @@ and resolveVar name state =
 let pushScope node state =
   { state with scope = { parent = Some state.scope; node = node; } }
     
+(* pops a scope from the state *)
+let popScope state =
+  match state.scope.parent with
+  | Some parent -> { state with scope = parent }
+  | None -> raise UnexpectedError
+  
 (* counting ***********************************************************************)
 
 (* generates a list of integers min..max *)
@@ -410,7 +416,6 @@ let cardConstraint vname lbound ubound state =
     
 (* translates a class-member variable *)
 let translateMemberVar cls var state =
-  let state = pushScope (S_Class cls) state in
   let (vname, t) = var in
   let state = output (cls.name  ^ "_" ^ vname) state in
   let ccount = count cls.name state in
@@ -472,7 +477,6 @@ let rec translateGlobalVar var state =
 
 (* translates a class-level constraint *)
 let translateClassConstraint cls con state =
-  let state = pushScope (S_Class cls) state in
   match con with
   | C_Where expr ->
     let ccount = string_of_int (count cls.name state) in
@@ -490,14 +494,18 @@ let translateGlobalConstraint con state =
 (* translates a class *)
 let translateClass cls state =
   (* TODO: inheritance [show in debugging output below too ]*)
-  let mzn = if state.comments then "\n% class " ^ cls.name ^ "\n" else "" in 
-  List.fold_left (fun (mzn, state) mbr ->
-    let (mzn', state) =
-      match mbr with
-      | M_Var var -> translateMemberVar cls var state
-      | M_Constraint con -> (translateClassConstraint cls con state, state) in
-    (mzn  ^ mzn', state)
-  ) (mzn, state) cls.members
+  let state = pushScope (S_Class cls) state in
+  let mzn = if state.comments then "\n% class " ^ cls.name ^ "\n" else "" in
+  let (mzn, state) = 
+    List.fold_left (fun (mzn, state) mbr ->
+      let (mzn', state) =
+        match mbr with
+        | M_Var var -> translateMemberVar cls var state
+        | M_Constraint con -> (translateClassConstraint cls con state, state) in
+      (mzn  ^ mzn', state)
+    ) (mzn, state) cls.members
+  in
+  (mzn, popScope state)
   
 (* translates the entire model *)
 let translateModel state =
