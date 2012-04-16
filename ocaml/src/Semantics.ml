@@ -40,6 +40,7 @@ exception ExpectedSet2 of string                    (* expected a set *)
 exception SetOfSet of string                        (* sets of sets are not permitted *)
 exception InvalidFieldAccess of string * string     (* invalid field access (field, type) *)
 exception IncompatibleTypes of string               (* expression of incompatible types *)
+exception NoInstancesOfClass of string              (* no instances of class for reference to resolve to *)
 
 (* resolves a class symbol *)
 let resolveClass name state =
@@ -274,8 +275,11 @@ let countModel state =
   ) state state.model.declarations
 
 (* get the object-count for class `cls` *)
-let count cls state =
-  StrMap.find cls state.counts
+let count cname state =
+  try
+    StrMap.find cname state.counts
+  with
+  | Not_found -> raise (NoInstancesOfClass cname)
     
 (* for debugging *)
 let printCounts state =
