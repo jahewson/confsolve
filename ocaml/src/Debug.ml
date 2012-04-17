@@ -38,6 +38,8 @@ let printAst (model: ConfSolve.model) =
   
 let printToken (tkn: Parser.token) =
   match tkn with
+  | LCURLY -> print_endline "LCURLY"
+  | RCURLY -> print_endline "LCURLY"
   | VAR -> print_endline "VAR"
   | AS -> print_endline "AS"
   | INT -> print_endline "INT"

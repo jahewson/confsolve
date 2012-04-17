@@ -40,6 +40,7 @@ rule token = parse
  | "exists"         { EXISTS }
  | "count"          { COUNT }
  | "in"             { IN }
+ | "where"          { WHERE }
  
  | '('              { LPAREN }
  | ')'              { RPAREN }

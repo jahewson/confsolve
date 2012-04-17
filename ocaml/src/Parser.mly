@@ -40,15 +40,15 @@ model:
 ;
 
 declarationList:
-  declaration                             { $1 :: [] }
-| declarationList SEMICOLON declaration   { $1 @ [$3] }
+  declaration                   { $1 :: [] }
+| declarationList declaration   { $1 @ [$2] }
 ;
 
 declaration:
-  varDecl   { $1 }
+  varDecl   SEMICOLON { $1 }
 | classDecl { $1 }
 /* enum... */
-| globalConstraint { $1 }
+| globalConstraint SEMICOLON { $1 }
 ;
 
 varDecl:
@@ -79,16 +79,22 @@ setType:
 | id LSQUARE INT_LITERAL RSQUARE                            { T_Set (T_Class $1, $3, $3) } /* move to finiteType once var-card */
 
 classDecl:
-  CLASS id EXTENDS id memberDeclList END  { G_Class { name=$2; super=Some $4; members=$5 } }
+  CLASS id EXTENDS id memberDeclBlock  { G_Class { name=$2; super=Some $4; members=$5 } }
+| CLASS id memberDeclBlock             { G_Class { name=$2; super=None; members=$3 } }
+;
+
+memberDeclBlock:
+  LCURLY RCURLY                   { [] }
+| LCURLY memberDeclList RCURLY    { $2 }
 ;
 
 memberDeclList:
-  memberDecl                             { $1 :: [] }
-| memberDeclList SEMICOLON memberDecl    { $1 @ [$3] }
+| memberDecl SEMICOLON                   { $1 :: [] }
+| memberDeclList memberDecl SEMICOLON    { $1 @ [$2] }
 ;
 
 memberDecl:
-  memberVarDecl    { $1 }
+| memberVarDecl    { $1 }
 | memberConstraint { $1 }
 ;
 
@@ -115,8 +121,8 @@ foldKind:
 | SUM     { Sum }
 
 fold:
-  foldKind id IN expr WHERE expr block  { E_Fold ($1, $2, $4, $6, $7) }
-| foldKind id IN expr block             { E_Fold ($1, $2, $4, E_Bool true, $5) }
+  foldKind id IN expr WHERE expr exprBlock  { E_Fold ($1, $2, $4, $6, $7) }
+| foldKind id IN expr exprBlock             { E_Fold ($1, $2, $4, E_Bool true, $5) }
 
 count: /* NOTE: parens are needed to avoid shift/reduce conflict */
   COUNT LPAREN id IN expr WHERE expr RPAREN { E_Fold (Sum, $3, $5, $7, E_Int 1) }
@@ -161,9 +167,9 @@ binaryExpr:
 | expr MOD expr           { E_Op ($1, Mod, $3) }
 ;
 
-block:
+exprBlock:
   LCURLY exprList RCURLY  { $2 }
   
 exprList:
-  expr                    { $1 }
-| exprList SEMICOLON expr { E_Op (E_Paren $1, And, E_Paren $3) }
+  expr SEMICOLON          { $1 }
+| exprList expr SEMICOLON { E_Op (E_Paren $1, And, E_Paren $2) }
