@@ -355,11 +355,11 @@ let rec translateExpr expr state =
        | S_Global -> vname
        | S_Class cls -> cls.name ^ "_" ^ vname ^ "[i]"
        | S_Expr e -> vname)
-       
+
   | E_Access (e, mname) ->
       let (cls, (_,mbr)) = resolveFieldAccess e mname state in
       cls.name ^ "_" ^ mname ^ "[" ^ translateExpr e state ^ "]"
-      
+
   | E_Fold (op, name, collection, where, body) ->
       let bodyState = pushScope (S_Expr expr) state in
       ignore (resolveVar name bodyState);
@@ -372,16 +372,26 @@ let rec translateExpr expr state =
             | _ -> false
             (* TODO: MUST detect anything non-constant inside this expression! *)
           in
-          let mzBody =
-            let filter = E_Op (E_Var name, In, collection) in (* <- TODO: optimise for fixed-card set of T_Class case *)
-            let body = if isConst then body else E_Op (filter, Implies, E_Paren body)
+          let mzBody = 
+            let guard = (* <- TODO: optimise for fixed-card set of T_Class case *)
+              if isConst then
+                E_Bool true
+              else
+                (E_Op (E_Var name, In, collection))
             in
-            if where = E_Bool true then
-              translateExpr body bodyState
-            else
+            let guard =
+              match (guard, where) with
+              | (E_Bool true, E_Bool true) -> E_Bool true
+              | (E_Bool true, _) -> where
+              | (_, E_Bool true) -> guard
+              | (_, _) -> (E_Op (guard, And, where))
+            in
+            if guard != E_Bool true then
               match op with
-              | ForAll | Exists -> translateExpr (E_Op (where, Implies, E_Paren body)) bodyState
-              | Sum -> "bool2int(" ^ translateExpr where bodyState ^ ") * " ^ translateExpr (E_Paren body) bodyState
+              | ForAll | Exists -> translateExpr guard bodyState ^ " -> " ^ translateExpr (E_Paren body) bodyState
+              | Sum -> "bool2int(" ^ translateExpr guard bodyState ^ ") * " ^ translateExpr (E_Paren body) bodyState
+            else
+              translateExpr (E_Paren body) bodyState
           in
           let mznRange =
             match t with
