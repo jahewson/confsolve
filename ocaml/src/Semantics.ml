@@ -279,7 +279,7 @@ let count cname state =
   try
     StrMap.find cname state.counts
   with
-  | Not_found -> raise (NoInstancesOfClass cname)
+  | Not_found -> 0 (* TODO: inheritance *)
     
 (* for debugging *)
 let printCounts state =
