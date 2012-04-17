@@ -29,6 +29,10 @@ rule token = parse
  | '<'              { LT }
  | "<="             { LE }
  
+ | "subset"         { SUBSET }
+ | "union"          { UNION }
+ | "intersection"   { INTERSECTION }
+ 
  | '!' | "not"      { NOT }
  | "&&" | "and"     { AND }
  | "||" | "or"      { OR }

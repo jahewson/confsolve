@@ -9,6 +9,7 @@ open ConfSolve
 %token ADD SUB MUL DIV MOD
 %token AND OR IMPLIES IFF
 %token NOT FORALL EXISTS SUM COUNT IN
+%token SUBSET UNION INTERSECTION
 %token VAR AS INT BOOL REF DOTS
 %token DOT
 %token CLASS EXTENDS END
@@ -25,6 +26,7 @@ open ConfSolve
 %left AND OR IMPLIES IFF
 %left EQ NEQ GT GE LT LE
 %left ADD SUB
+%left IN SUBSET UNION INTERSECTION
 %left MUL DIV MOD
 %nonassoc UMINUS NOT
 
@@ -154,6 +156,11 @@ binaryExpr:
 | expr GE expr            { E_Op ($1, Ge, $3) }
 | expr LT expr            { E_Op ($1, Lt, $3) }
 | expr LE expr            { E_Op ($1, Le, $3) }
+
+| expr IN expr            { E_Op ($1, In, $3) }
+| expr SUBSET expr        { E_Op ($1, In, $3) }
+| expr UNION expr         { E_Op ($1, In, $3) }
+| expr INTERSECTION expr  { E_Op ($1, In, $3) }
 
 | expr AND expr           { E_Op ($1, And, $3) }
 | expr OR expr            { E_Op ($1, Or, $3) }
