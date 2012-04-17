@@ -57,7 +57,7 @@ rule token = parse
  | "ref"            { REF }
  | ".."             { DOTS }
  | "class"          { CLASS }
- | "extends" | ":"  { EXTENDS }
+ | "extends"| "inherits" | ":"  { EXTENDS }
  | "end"            { END }
  
  | "maximize"       { MAXIMIZE }
