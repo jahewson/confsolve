@@ -158,9 +158,9 @@ binaryExpr:
 | expr LE expr            { E_Op ($1, Le, $3) }
 
 | expr IN expr            { E_Op ($1, In, $3) }
-| expr SUBSET expr        { E_Op ($1, In, $3) }
-| expr UNION expr         { E_Op ($1, In, $3) }
-| expr INTERSECTION expr  { E_Op ($1, In, $3) }
+| expr SUBSET expr        { E_Op ($1, Subset, $3) }
+| expr UNION expr         { E_Op ($1, Union, $3) }
+| expr INTERSECTION expr  { E_Op ($1, Intersection, $3) }
 
 | expr AND expr           { E_Op ($1, And, $3) }
 | expr OR expr            { E_Op ($1, Or, $3) }
