@@ -3,7 +3,7 @@ open Parser
 open Lexing
 }
 rule token = parse
-   [' ' '\t' '\n']  { token lexbuf }     (* skip whitespace *)
+   [' ' '\t' '\n' '\r']  { token lexbuf }     (* skip whitespace *)
  | ['0'-'9']+       { INT_LITERAL( int_of_string(lexeme lexbuf)) }
  | "true"           { TRUE }
  | "false"          { FALSE }
