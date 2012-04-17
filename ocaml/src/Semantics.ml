@@ -491,8 +491,8 @@ let translateClassConstraint cls con state =
 let translateGlobalConstraint con state =
   match con with
   | C_Where expr ->
-    "\n% global\n" ^
-    "constraint\n  " ^ translateExpr expr state ^ "\n;\n"
+    (if state.comments then "\n% global" else "") ^
+    "\nconstraint\n  " ^ translateExpr expr state ^ "\n;\n"
   | C_Maximise expr -> raise (NotImplemented "global maximise") (* TODO *)
 
 (* translates a class *)
@@ -510,7 +510,7 @@ let translateClass cls state =
     ) (mzn, state) cls.members
   in
   (mzn, popScope state)
-  
+
 (* translates the entire model *)
 let translateModel state =
   List.fold_left (fun (mzn, state) d ->
@@ -538,7 +538,7 @@ let toMiniZinc csModel showCounting hasComments =
   else
     (* 2nd pass: translate to MiniZinc *)
     let (mzn, state) = translateModel state in
-    mzn ^ "\nsolve satisfy;\n"
+    mzn ^ "\nsolve satisfy;\n\n"
         ^ "output ["
         ^ (listToMz state.mzn_output)
         ^ "];"
