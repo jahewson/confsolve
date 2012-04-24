@@ -147,7 +147,7 @@ expr:
 
 variable:
   id                      { E_Var $1 }
-| variable DOT id         { E_Access ($1, $3) }
+| variable DOT id         { if $3 = "size" then E_Card $1 else E_Access ($1, $3) }
 
 binaryExpr:
   expr EQ expr            { E_Op ($1, Eq, $3) }
