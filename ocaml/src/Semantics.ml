@@ -386,7 +386,7 @@ let rec translateExpr expr state =
               | (_, E_Bool true) -> guard
               | (_, _) -> (E_Op (guard, And, where))
             in
-            if guard != E_Bool true then
+            if guard <> E_Bool true then
               match op with
               | ForAll | Exists -> translateExpr guard bodyState ^ " -> " ^ translateExpr (E_Paren body) bodyState
               | Sum -> "bool2int(" ^ translateExpr guard bodyState ^ ") * " ^ translateExpr (E_Paren body) bodyState
