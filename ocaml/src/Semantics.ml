@@ -285,7 +285,7 @@ let count cname state =
   | Not_found -> 0
   
   
-(* EXPERIMENTAL *)
+(* add a subclass of `super` *)
 let addSubclass super sub state =
   { state with subclasses =
       if StrMap.mem super state.subclasses then
@@ -524,7 +524,7 @@ let translateMemberVar cls var state =
       (mzn, state)
   | T_Set (T_Class cname, lbound, ubound) ->
       if lbound <> ubound then
-        raise (NotImplemented "var-card sets of objects") (* which will require card constraints! *)
+        raise (NotImplemented "variable cardinality sets of objects")
       else
         let (indices, state) =
           (List.fold_left (fun (arr, state) elem ->
@@ -551,12 +551,12 @@ let rec translateGlobalVar var state =
   let mzn = if state.comments then "\n% " ^ vname ^ " as " ^ typeToString t ^ "\n" else "" in
   match t with
   | T_Class cname ->
-      let (idx, state) = newIndex cname state in       (* <---- THIS SHALL BE MY APPROACH TO TRANSLATION - ACTUALLY use state *)
+      let (idx, state) = newIndex cname state in
       let mzn = mzn  ^ translateType t state ^ ": " ^ vname ^ " = " ^ idx ^ ";\n" in
       (mzn, state)
   | T_Set (T_Class cname, lbound, ubound) ->
       if lbound <> ubound then
-        raise (NotImplemented "var-card sets of objects")  (* which will require card constraints! *)
+        raise (NotImplemented "variable cardinality sets of objects")
       else
         let (indices, state) = newIndices cname ubound state in
         let mzn = mzn ^ translateType t state ^ ": " ^ vname in
