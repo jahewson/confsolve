@@ -66,7 +66,7 @@ rule token = parse
  | ".."             { DOTS }
  | "class"          { CLASS }
  | "extends"| "inherits" | ":"  { EXTENDS }
- | "end"            { END }
+ | "abstract"       { ABSTRACT }
  
  | "maximize"       { MAXIMIZE }
  

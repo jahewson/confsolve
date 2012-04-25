@@ -12,7 +12,7 @@ open ConfSolve
 %token SUBSET UNION INTERSECTION
 %token VAR AS INT BOOL REF DOTS
 %token DOT
-%token CLASS EXTENDS END
+%token CLASS EXTENDS ABSTRACT
 %token SEMICOLON
 %token WHERE MAXIMIZE
 %token TRUE FALSE
@@ -81,9 +81,13 @@ setType:
 | id LSQUARE INT_LITERAL RSQUARE                            { T_Set (T_Class $1, $3, $3) } /* move to finiteType once var-card */
 
 classDecl:
-  CLASS id EXTENDS id memberDeclBlock  { G_Class { name=$2; super=Some $4; members=$5 } }
-| CLASS id memberDeclBlock             { G_Class { name=$2; super=None; members=$3 } }
+  abstract CLASS id EXTENDS id memberDeclBlock  { G_Class { name=$3; super=Some $5; members=$6; abstract=$1 } }
+| abstract CLASS id memberDeclBlock             { G_Class { name=$3; super=None; members=$4; abstract=$1 } }
 ;
+
+abstract:
+  ABSTRACT  { true }
+|           { false }
 
 memberDeclBlock:
   LCURLY RCURLY                   { [] }

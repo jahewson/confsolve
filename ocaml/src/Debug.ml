@@ -45,7 +45,7 @@ let printToken (tkn: Parser.token) =
   | INT -> print_endline "INT"
   | CLASS -> print_endline "CLASS"
   | EXTENDS -> print_endline "EXTENDS"
-  | END -> print_endline "END"
+  | ABSTRACT -> print_endline "ABSTRACT"
   | WHERE -> print_endline "WHERE"
   | MAXIMIZE -> print_endline "MAXIMIZE"
   | ID(id) -> print_endline("ID \"" ^ snd(id) ^ "\"");

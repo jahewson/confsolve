@@ -20,13 +20,14 @@ type scope = {
 
 (* translation state *)
 type state = {
-  model: ConfSolve.model;   (* ConfSolve AST *)
-  counts: int StrMap.t;     (* object counts per-class *)
-  indexes: int StrMap.t;    (* current index per-class *)
-  scope: scope;             (* scope tree *)
-  mzn_output: string list;  (* MiniZinc `output` variables *)
-  show_counting: bool;      (* debugging - print the object counts *)
-  comments: bool;           (* debugging - comment MiniZinc output *)
+  model: ConfSolve.model;         (* ConfSolve AST *)
+  counts: int StrMap.t;           (* object counts per-class *)
+  subclasses: int list StrMap.t;  (* map of superclass names to subclass indices *)
+  indexes: int StrMap.t;          (* current index per-class *)
+  scope: scope;                   (* scope tree *)
+  mzn_output: string list;        (* MiniZinc `output` variables *)
+  show_counting: bool;            (* debugging - print the object counts *)
+  comments: bool;                 (* debugging - comment MiniZinc output *)
 }
 
 (* binding ************************************************************************)
@@ -41,6 +42,7 @@ exception SetOfSet of string                        (* sets of sets are not perm
 exception InvalidFieldAccess of string * string     (* invalid field access (field, type) *)
 exception IncompatibleTypes of string               (* expression of incompatible types *)
 exception NoInstancesOfClass of string              (* no instances of class for reference to resolve to *)
+exception AbstractInstance of string                (* cannot create an instance of an abstract class *)
 
 (* resolves a class symbol *)
 let resolveClass name state =
@@ -75,29 +77,37 @@ let resolveGlobalVar name state =
   | None -> raise (VarNotDefined name)    (* TODO: line numbers *)
 
 (* resolves a class-level variable symbol *)
-let actualResolveMemberVar cls name state =
-  List.fold_left (fun res decl ->
-    match decl with
-    | M_Var v ->
-      (match res with
-       | Some v -> res
-       | None -> if fst v = name then Some v else None
-      )
-    | _ -> res
-  ) None cls.members
-  (* TODO: inheritance *)
+let rec actualResolveMemberVar cls name state =
+  let member =
+    List.fold_left (fun res decl ->
+      match decl with
+      | M_Var v ->
+        (match res with
+         | Some v -> res
+         | None -> if fst v = name then Some v else None
+        )
+      | _ -> res
+    ) None cls.members
+  in
+  match (member, cls.super) with
+  | (None, None) 
+  | (Some _, _) -> (member, cls)
+  | (None, Some cname) ->
+      let super = (resolveClass cname state) in
+      actualResolveMemberVar super name state
     
 (* resolves a class-level variable symbol, only *)
 let strictResolveMemberVar cls name state =
   match actualResolveMemberVar cls name state with
-  | Some v -> v
-  | None -> raise (MemberVarNotDefined (name, cls.name))    (* TODO: line numbers *)
+  | (Some v, c) -> (v, c)
+  | (None, _) -> raise (MemberVarNotDefined (name, cls.name))    (* TODO: line numbers *)
     
-(* resolves a class-level variable symbol, with global fallback *)
+(* resolves a class-level variable symbol, with global fallback,
+   returning both the variable and class which defined it *)
 let resolveMemberVar cls name state =
   match actualResolveMemberVar cls name state with
-  | Some v -> v
-  | None -> resolveGlobalVar name state
+  | (Some v, c) -> (v, c)
+  | (None, c) -> (resolveGlobalVar name state, c)
     
 (* for reporting compile errors *)
 let rec typeToString (t: _type) =
@@ -113,7 +123,7 @@ let rec typeToString (t: _type) =
 let rec typeof expr state =
   match expr with
   | E_Var vname -> snd (resolveVar vname state)
-  | E_Access (e, fname) -> snd (snd (resolveFieldAccess e fname state))
+  | E_Access (e, fname) -> let (_,v,_) = resolveFieldAccess e fname state in snd (v)
   | E_Op (_, Eq, _) -> T_Bool
   | E_Op (_, Neq, _) -> T_Bool
   | E_Op (_, Gt, _) -> T_Bool
@@ -122,8 +132,8 @@ let rec typeof expr state =
   | E_Op (_, Le, _) -> T_Bool
   | E_Op (_, In, _) -> T_Bool
   | E_Op (_, Subset, _) -> T_Bool
-  | E_Op (e1, Union, e2) -> typeOfSet e1 Union e2 state
-  | E_Op (e1, Intersection, e2) -> typeOfSet e1 Intersection e2 state
+  | E_Op (e1, Union, e2) -> typeOfSetOp e1 Union e2 state
+  | E_Op (e1, Intersection, e2) -> typeOfSetOp e1 Intersection e2 state
   | E_Op (_, And, _) -> T_Bool
   | E_Op (_, Or, _) -> T_Bool
   | E_Op (_, Implies, _) -> T_Bool
@@ -142,30 +152,54 @@ let rec typeof expr state =
   | E_Card e -> T_Int
   | E_Paren e -> typeof e state
 
-and typeOfSet e1 op e2 state =
-  (match (typeof e1 state, typeof e2 state) with
-  | (T_Set (t1, lb1, ub1), T_Set (t2, lb2, ub2)) ->
-      let t = 
-        match (t1, t2) with
-        | (T_Bool, T_Bool) -> T_Bool
-        | (T_Range (m1,n1), T_Range (m2,n2)) ->
-            (match op with
-             | Intersection -> T_Range (max m1 m2, min n1 n2)
-             | Union ->        T_Range (min m1 m2, max n1 n2)
-             | _ -> raise UnexpectedError)
-        | (T_Ref cname1, T_Ref cname2)
-        | (T_Class cname1, T_Class cname2) ->
-            if cname1 = cname2 then
-              T_Class cname1 (* TODO: inheritance *)
-            else
-              raise (IncompatibleTypes "intersection")
-        | _ -> raise (IncompatibleTypes "intersection")
-      in
-      (match op with
-       | Intersection -> T_Set (t, 0, min ub1 ub2)
-       | Union ->        T_Set (t, 0, ub1 + ub2)
-       | _ -> raise UnexpectedError)
-  | _ -> raise (IncompatibleTypes "intersection"))
+(* return a list of all ancestors of a class, sorted by distance *)
+and ancestors cls ancs state =
+  let ancs = ancs @ [cls.name] in
+  match cls.super with
+  | None -> ancs
+  | Some cname -> ancestors (resolveClass cname state) ancs state
+
+(* intersect two lists *)
+and intersect l1 l2 =
+  List.filter (fun v ->
+    List.mem v l2
+  ) l1
+        
+(* find the closest common ancestor of two classes *)
+and commonAncestor cls1 cls2 state =
+  let a1 = ancestors cls1 [] state in
+  let a2 = ancestors cls2 [] state in
+  let ancs = intersect a1 a2 in
+  if List.length ancs = 0 then
+    None
+  else
+    Some (List.hd ancs)
+  
+(* determines the type of a setexpression *)
+and typeOfSetOp e1 op e2 state =
+  let t1 = typeof e1 state and t2 = typeof e2 state in
+    match (t1, t2) with
+    | (T_Set (t1, lb1, ub1), T_Set (t2, lb2, ub2)) ->
+        let t = 
+          match (t1, t2) with
+          | (T_Bool, T_Bool) -> T_Bool
+          | (T_Range (m1,n1), T_Range (m2,n2)) ->
+              (match op with
+               | Intersection -> T_Range (max m1 m2, min n1 n2)
+               | Union ->        T_Range (min m1 m2, max n1 n2)
+               | _ -> raise UnexpectedError)
+          | (T_Ref cname1, T_Ref cname2)
+          | (T_Class cname1, T_Class cname2) ->
+              (match commonAncestor (resolveClass cname1 state) (resolveClass cname2 state) state with
+               | Some cname -> T_Class cname
+               | None -> raise (IncompatibleTypes (cname1 ^ ", " ^ cname2)))
+          | _ -> raise (IncompatibleTypes (typeToString t1 ^ ", " ^ typeToString t2))
+        in
+        (match op with
+         | Intersection -> T_Set (t, 0, min ub1 ub2)
+         | Union ->        T_Set (t, 0, ub1 + ub2)
+         | _ -> raise UnexpectedError)
+    | _ -> raise (IncompatibleTypes (typeToString t1 ^ ", " ^ typeToString t2))
 
 (* resolves both class and field of a field access expression *)
 and resolveFieldAccess expr fname state =
@@ -175,7 +209,8 @@ and resolveFieldAccess expr fname state =
     | T_Class cname -> resolveClass cname state
     | _ -> raise (InvalidFieldAccess (fname, typeToString (typeof expr state)))
   in
-  (cls, strictResolveMemberVar cls fname state)
+  let r = strictResolveMemberVar cls fname state in
+  (snd(r), fst(r), snd(r))    (* <-- NEW: actually, just return the clsDecl rather than the straight class! *)
 
 (* returns the element type of a collection *)
 and elementType t name =
@@ -199,7 +234,7 @@ and resolveExprVar expr name state =
   | None ->
     match state.scope.node with
      | S_Global -> resolveGlobalVar name state
-     | S_Class cls -> resolveMemberVar cls name state
+     | S_Class cls -> fst (resolveMemberVar cls name state)
      | S_Expr expr -> 
         resolveExprVar expr name { state with scope = match state.scope.parent with
                                                       | Some s -> s
@@ -209,7 +244,7 @@ and resolveExprVar expr name state =
 and resolveVar name state =
   match state.scope.node with
   | S_Global -> resolveGlobalVar name state
-  | S_Class cls -> resolveMemberVar cls name state
+  | S_Class cls -> fst (resolveMemberVar cls name state)
   | S_Expr expr -> resolveExprVar expr name state 
 
 (* pushes a scope to the state *)
@@ -233,13 +268,41 @@ let seq min max =
       next (cur + 1) (range @ [cur])
   in
   next min []
-  
-(* increment object count *)
-let incr cls counts =
-  if StrMap.mem cls counts then
-    StrMap.add cls ((StrMap.find cls counts) + 1) counts
+
+(* increment count of key in lst *)
+let incr key lst =
+  if StrMap.mem key lst then
+    StrMap.add key ((StrMap.find key lst) + 1) lst
   else
-    StrMap.add cls 1 counts
+    StrMap.add key 1 lst
+
+(* get the object-count for class `cls` *)
+let count cname state =
+  try
+    StrMap.find cname state.counts
+  with
+  | Not_found -> 0
+  
+  
+(* EXPERIMENTAL *)
+let addSubclass super sub state =
+  { state with subclasses =
+      if StrMap.mem super state.subclasses then
+        StrMap.add super ((StrMap.find super state.subclasses) @ [sub]) state.subclasses
+      else
+        StrMap.add super (sub :: []) state.subclasses
+  }
+    
+(* increment object count *)
+let rec countObj cls state =
+  let state = { state with counts = incr cls.name state.counts } 
+  in
+  match cls.super with
+  | Some sname ->
+    let id = count cls.name state in
+    let state = addSubclass sname id state in
+    countObj (resolveClass sname state) state
+  | None -> state
     
 (* count objects for a varDecl *)
 let rec countVarDecl var state =
@@ -247,7 +310,7 @@ let rec countVarDecl var state =
   | T_Class cname ->
       if state.show_counting then print_endline (fst var ^ ": " ^ cname) else ignore 0;
       let cls = resolveClass cname state in
-      let state = { state with counts = incr cname state.counts } in (* TODO: inheritance *)
+      let state = countObj cls state in
       List.fold_left (fun state mbr ->
         match mbr with
         | M_Var v -> countVarDecl v state
@@ -257,7 +320,7 @@ let rec countVarDecl var state =
       if state.show_counting then print_endline (fst var ^ ": " ^ cname ^ "[" ^ string_of_int ubound ^ "]") else ignore 0;
       let cls = resolveClass cname state in
       List.fold_left (fun state elem ->
-        let state = { state with counts = incr cname state.counts } in (* TODO: inheritance *)
+        let state = countObj cls state in
         List.fold_left (fun state mbr ->
           match mbr with
           | M_Var v -> countVarDecl v state
@@ -273,13 +336,6 @@ let countModel state =
     | G_Var v -> countVarDecl v state
     | _ -> state
   ) state state.model.declarations
-
-(* get the object-count for class `cls` *)
-let count cname state =
-  try
-    StrMap.find cname state.counts
-  with
-  | Not_found -> 0 (* TODO: inheritance *)
     
 (* for debugging *)
 let printCounts state =
@@ -288,7 +344,7 @@ let printCounts state =
   ) state.counts
 
 (* translation ********************************************************************)
-  
+
 (* generates a new index for an object *)
 let newIndex cname state =
   let indexes' = incr cname state.indexes in
@@ -306,25 +362,50 @@ let newIndices cname num state =
       (indices, state)
   in
   next 1 [] state
-    
+
+(* check if a range is contiguous *)
+let isContiguous list =
+  let (_,_,is) =
+    List.fold_left (fun (prev, idx, is) elem ->
+      if idx = 0 then
+        (elem, 1, true)
+      else
+        (elem, idx + 1, is && elem = prev + 1)
+    ) (0, 0, true) list
+  in is
+
+(* integer list to MiniZinc array literal,
+   with collapsing to a range if contiguous *)
+let intListToMz list =
+  if isContiguous list then
+    string_of_int (List.hd list) ^ ".." ^ string_of_int (List.nth list ((List.length list) - 1))
+  else
+    List.fold_left (fun mzn elem ->
+      if String.length mzn = 0 then
+        string_of_int elem
+      else
+        mzn ^ "," ^ string_of_int elem
+    ) "" list
+  
 (* translates a type *)
 let rec translateType t state =
   match t with
   | T_Int -> "int"
   | T_Bool -> "bool"
   | T_Range (m, n) -> string_of_int m ^ ".." ^ string_of_int n
-  | T_Class cname
-  | T_Ref cname ->
-      ignore (resolveClass cname state);
+   | T_Class cname ->
+      let cls = (resolveClass cname state) in
+      if cls.abstract then raise (AbstractInstance (cls.name)) else ignore 0;
       "1.." ^ string_of_int (count cname state)
+  | T_Ref cname ->
+      let cls = (resolveClass cname state) in
+      if cls.abstract then
+        intListToMz (StrMap.find cname state.subclasses)
+      else
+        "1.." ^ string_of_int (count cname state)
   | T_Set (t, lbound, ubound) ->
-      (match t with
-       | T_Class cname 
-       | T_Ref cname -> ignore (resolveClass cname state);
-       | _ -> ignore 0
-      );
       "set of " ^ translateType t state
-    
+
 (* list to MiniZinc array literal *)
 let listToMz list =
   List.fold_left (fun mzn elem ->
@@ -333,7 +414,7 @@ let listToMz list =
     else
       mzn ^ "," ^ elem
   ) "" list
-    
+        
 (* records variables for MiniZinc `output` section *)
 let output mz_vname state =
   { state with mzn_output = ("\n  show(" ^ (mz_vname) ^ ")") :: state.mzn_output }
@@ -357,7 +438,7 @@ let rec translateExpr expr state =
        | S_Expr e -> vname)
 
   | E_Access (e, mname) ->
-      let (cls, (_,mbr)) = resolveFieldAccess e mname state in
+      let (cls, (_,mbr), clsDecl) = resolveFieldAccess e mname state in
       cls.name ^ "_" ^ mname ^ "[" ^ translateExpr e state ^ "]"
 
   | E_Fold (op, name, collection, where, body) ->
@@ -494,7 +575,7 @@ let translateClassConstraint cls con state =
   match con with
   | C_Where expr ->
     let ccount = string_of_int (count cls.name state) in
-    "\nconstraint\n  forall (i in 1.." ^ ccount ^ ") (\n    " ^ translateExpr expr state ^ "\n  )\n;\n"
+    "\nconstraint\n  forall (i in 1.." ^ ccount ^ ") (\n    " ^ translateExpr expr state ^ "\n  );\n"
   | C_Maximise expr -> raise (NotImplemented "class-level maximise") (* TODO *)
     
 (* translates a global constraint *)
@@ -502,23 +583,37 @@ let translateGlobalConstraint con state =
   match con with
   | C_Where expr ->
     (if state.comments then "\n% global" else "") ^
-    "\nconstraint\n  " ^ translateExpr expr state ^ "\n;\n"
+    "\nconstraint\n  " ^ translateExpr expr state ^ ";\n"
   | C_Maximise expr -> raise (NotImplemented "global maximise") (* TODO *)
 
 (* translates a class *)
-let translateClass cls state =
-  (* TODO: inheritance [show in debugging output below too ]*)
+let rec translateClassBody cls clsSuper mzn state =
+  List.fold_left (fun (mzn, state) mbr ->
+    let (mzn', state) =
+      match mbr with
+      | M_Var var -> translateMemberVar cls var state
+      | M_Constraint con -> ("", state) (*translateClassConstraint cls con state, state DEBUG*) in
+    (mzn  ^ mzn', state)
+  ) (mzn, state) clsSuper.members
+
+(* translates a class *)
+and translateClass cls state =
   let state = pushScope (S_Class cls) state in
   let mzn = if state.comments then "\n% class " ^ cls.name ^ "\n" else "" in
-  let (mzn, state) = 
-    List.fold_left (fun (mzn, state) mbr ->
-      let (mzn', state) =
-        match mbr with
-        | M_Var var -> translateMemberVar cls var state
-        | M_Constraint con -> (translateClassConstraint cls con state, state) in
-      (mzn  ^ mzn', state)
-    ) (mzn, state) cls.members
+  let (mzn, state) =
+    (match cls.super with
+    | Some cname ->
+        let super = (resolveClass cname state) in
+        if not super.abstract then
+          raise (NotImplemented ("`" ^ cls.name ^ "` inherits non-abstract class `" ^ cname ^ "`"))
+        else
+          ignore 0;
+        (mzn, state)
+    | None -> (mzn, state))
   in
+  (* current class *)
+  let mzn = mzn ^ "\n% own members\n" in
+  let (mzn, state) = translateClassBody cls cls mzn state in
   (mzn, popScope state)
 
 (* translates the entire model *)
@@ -539,7 +634,7 @@ let toMiniZinc csModel showCounting hasComments =
   (* 1st pass: count objects *)
   let scope = { parent = None; node = S_Global} in
   let state = { counts = StrMap.empty; indexes = StrMap.empty; model = csModel; 
-                scope = scope; show_counting = showCounting; 
+                scope = scope; subclasses = StrMap.empty; show_counting = showCounting; 
                 mzn_output = []; comments = hasComments } in
   let state = countModel state in
   if showCounting then
