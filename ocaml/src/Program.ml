@@ -22,7 +22,6 @@ let main () =
   in
   let arglist = [
     ("-c", Arg.Set hasComments, "comment the MiniZinc");
-    (*("-o", Arg.Set_string filename, "output filename")*) (* TODO *)
     ("--debug-tokens", Arg.Set showTokens, "print lexer tokens (debug)");
     ("--debug-ast", Arg.Set showAst, "print AST (debug)");
     ("--debug-counting", Arg.Set showCounting, "print object count (debug)")] 

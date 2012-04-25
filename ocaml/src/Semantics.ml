@@ -2,7 +2,7 @@ open ConfSolve
 module StrMap = Map.Make(String)
 
 exception UnexpectedError
-exception NotImplemented of string (* TODO: should be none of these left *)
+exception NotImplemented of string
 
 (* state ************************************************************************)
 
@@ -451,12 +451,11 @@ let rec translateExpr expr state =
       | T_Set (t, lbound, ubound) ->
           let isConst =
             match t with
-            | T_Class cname -> ubound = lbound (* TODO: Do these really have to be the same? (not that i have varcard anyway)*)
+            | T_Class cname -> ubound = lbound
             | _ -> false
-            (* TODO: MUST detect anything non-constant inside this expression! *)
           in
           let mzBody = 
-            let guard = (* <- TODO: optimise for fixed-card set of T_Class case *)
+            let guard =
               if isConst then
                 E_Bool true
               else
@@ -485,7 +484,6 @@ let rec translateExpr expr state =
                 "1.." ^ string_of_int (count cname state)
             | T_Ref cname -> "1.." ^ string_of_int (count cname state)
             | _ -> string_of_int lbound ^ ".." ^ string_of_int ubound
-            (* TODO: auto-max for class refs... *)
           in
           (match op with | ForAll -> "forall" | Exists -> "exists" | Sum -> "sum")
           ^ " (" ^ name ^ " in " ^ mznRange ^ ") (\n"
