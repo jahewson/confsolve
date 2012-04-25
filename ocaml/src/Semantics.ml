@@ -210,7 +210,7 @@ and resolveFieldAccess expr fname state =
     | _ -> raise (InvalidFieldAccess (fname, typeToString (typeof expr state)))
   in
   let r = strictResolveMemberVar cls fname state in
-  (snd(r), fst(r), snd(r))    (* <-- NEW: actually, just return the clsDecl rather than the straight class! *)
+  (snd(r), fst(r), snd(r))
 
 (* returns the element type of a collection *)
 and elementType t name =
@@ -434,7 +434,9 @@ let rec translateExpr expr state =
       ignore (resolveVar vname state);
       (match state.scope.node with
        | S_Global -> vname
-       | S_Class cls -> cls.name ^ "_" ^ vname ^ "[i]"
+       | S_Class cls ->
+           let (_, clsDecl) = resolveMemberVar cls vname state in
+           clsDecl.name ^ "_" ^ vname ^ "[i]"
        | S_Expr e -> vname)
 
   | E_Access (e, mname) ->
@@ -592,7 +594,7 @@ let rec translateClassBody cls clsSuper mzn state =
     let (mzn', state) =
       match mbr with
       | M_Var var -> translateMemberVar cls var state
-      | M_Constraint con -> ("", state) (translateClassConstraint cls con state, state DEBUG*) in
+      | M_Constraint con -> translateClassConstraint cls con state, state in
     (mzn  ^ mzn', state)
   ) (mzn, state) clsSuper.members
 
