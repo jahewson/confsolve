@@ -52,9 +52,9 @@ let main () =
       with
       | Parsing.Parse_error ->
         let tok = Lexing.lexeme lexbuf in
-        let curr = lexbuf.Lexing.lex_curr_p in
-        let cnum = curr.Lexing.pos_cnum - curr.Lexing.pos_bol in
-        let line = curr.Lexing.pos_lnum in
+        let curr = lexbuf.lex_curr_p in
+        let cnum = curr.pos_cnum - curr.pos_bol in
+        let line = curr.pos_lnum in
         print_endline ("File \"" ^ !filename ^ "\", line " ^ string_of_int line ^ " character " ^ string_of_int cnum ^
                        ":\nError: Syntax error at `" ^ tok ^ "`");
         exit 1

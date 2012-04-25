@@ -49,7 +49,7 @@ type classDecl = {
    name: className;
    super: className option;
    members: memberDecl list;
-   abstract: bool;
+   isAbstract: bool;
  }
  
 type globalDecl =

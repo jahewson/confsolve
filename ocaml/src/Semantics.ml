@@ -79,7 +79,7 @@ let resolveGlobalVar name state =
 
 (* resolves a class-level variable symbol *)
 let rec actualResolveMemberVar cls name state =
-  let member =
+  let mbr =
     List.fold_left (fun res decl ->
       match decl with
       | M_Var v ->
@@ -90,9 +90,9 @@ let rec actualResolveMemberVar cls name state =
       | _ -> res
     ) None cls.members
   in
-  match (member, cls.super) with
+  match (mbr, cls.super) with
   | (None, None) 
-  | (Some _, _) -> (member, cls)
+  | (Some _, _) -> (mbr, cls)
   | (None, Some cname) ->
       let super = (resolveClass cname state) in
       actualResolveMemberVar super name state
@@ -178,7 +178,8 @@ and commonAncestor cls1 cls2 state =
   
 (* determines the type of a setexpression *)
 and typeOfSetOp e1 op e2 state =
-  let t1 = typeof e1 state and t2 = typeof e2 state in
+  let t1 = typeof e1 state in
+  let t2 = typeof e2 state in
     match (t1, t2) with
     | (T_Set (t1, lb1, ub1), T_Set (t2, lb2, ub2)) ->
         let t = 
@@ -287,11 +288,12 @@ let count cname state =
   
 (* add a subclass of `super` *)
 let addSubclass super sub state =
-  { state with subclasses =
-      if StrMap.mem super state.subclasses then
-        StrMap.add super ((StrMap.find super state.subclasses) @ [sub]) state.subclasses
-      else
-        StrMap.add super (sub :: []) state.subclasses
+  { state with
+      subclasses =
+        if StrMap.mem super state.subclasses then
+          StrMap.add super ((StrMap.find super state.subclasses) @ [sub]) state.subclasses
+        else
+          StrMap.add super (sub :: []) state.subclasses
   }
     
 (* increment object count *)
@@ -396,11 +398,11 @@ let rec translateType t state =
   | T_Range (m, n) -> string_of_int m ^ ".." ^ string_of_int n
    | T_Class cname ->
       let cls = (resolveClass cname state) in
-      if cls.abstract then raise (AbstractInstance (cls.name)) else ();
+      if cls.isAbstract then raise (AbstractInstance (cls.name)) else ();
       "1.." ^ string_of_int (count cname state)
   | T_Ref cname ->
       let cls = (resolveClass cname state) in
-      if cls.abstract then
+      if cls.isAbstract then
         intListToMz (StrMap.find cname state.subclasses)
       else
         "1.." ^ string_of_int (count cname state)
@@ -621,7 +623,7 @@ and translateClass cls state =
     (match cls.super with
     | Some cname ->
         let super = (resolveClass cname state) in
-        if not super.abstract then
+        if not super.isAbstract then
           raise (NotImplemented ("`" ^ cls.name ^ "` inherits non-abstract class `" ^ cname ^ "`"))
         else ();
         (mzn, state)
@@ -664,7 +666,8 @@ let toMiniZinc csModel showCounting hasComments =
         output "total_objective" state
       else state
     in
-    let mzn = mzn ^
+    let mzn =
+      mzn ^
       if state.maximise_count > 0 then
         "var int: total_objective;\n" ^
         "constraint total_objective = " ^

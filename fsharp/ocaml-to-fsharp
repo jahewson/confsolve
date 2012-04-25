@@ -52,7 +52,7 @@ files.forEach(function(filename) {
   code = code.replace(/;;$/gm, ''); // only 2xSemicolons
   
   // strings
-  code = code.replace(/\^/g, '+');
+  code = code.replace(/(\s)(\^)/g, '$1+');
   code = code.replace(/string_of_int/g, 'string');
   code = code.replace(/int_of_string/g, 'Int32.Parse');
   code = code.replace(/int_of_bool/g, 'Bool.Parse');
@@ -75,14 +75,15 @@ files.forEach(function(filename) {
   // exceptions
   code = code.replace(/Not_found/, ':? System.IndexOutOfRangeException');
   
-  // Map
+  // StrMap
   code = code.replace(/module StrMap = .*/, "");
   code = code.replace(/StrMap\.mem/g, "Map.containsKey");
+  code = code.replace(/int list StrMap\.t/g, "Map<string,List<int>>");
   code = code.replace(/int StrMap\.t/g, "Map<string,int>");
   code = code.replace(/StrMap/g, "Map");  // last!
   
   // let
-  code = code.replace(/( in)(\s*$)/gm, '$2');
+  //code = code.replace(/( in)(\s*$)/gm, '$2');
   
   // file i/o
   if (filename == 'Program.ml') {
@@ -97,15 +98,35 @@ files.forEach(function(filename) {
   }
   
   if (filename == 'Lexer.mll') {
-    code = code.replace(/open Lexing/, 
-        'open Microsoft.FSharp.Text.Lexing\n' +
-        'let lexeme = Lexing.LexBuffer<_>.LexemeString\n' +
-        'let lexeme_start_p (lexbuf : Lexing.LexBuffer<_>) = lexbuf.StartPos');
+    code = code.substr(code.indexOf('rule token'));
+    
+    code =
+      '{\n' +
+      'module Lexer\n' +
+      'open Parser\n' +
+      'open System\n' +
+      'open Microsoft.FSharp.Text.Lexing\n\n' +
+      'let lexeme = Lexing.LexBuffer<char>.LexemeString\n' +
+      'let lexeme_start_p (lexbuf : Lexing.LexBuffer<char>) = lexbuf.StartPos\n\n' +
+      'let incr_lineno (lexbuf : Lexing.LexBuffer<char>) = \n' +
+      //'  lexbuf.EndPos <- lexbuf.EndPos.AsNewLinePos()\n\n' +
+      '  ()\n\n' +
+      'let lineno (lexbuf : Lexing.LexBuffer<char>) =\n' +
+      //'  lexbuf.StartPos.Line\n' +
+      '  lexbuf.StartPos.NextLine\n' +
+      '}\n\n'
+      + code; 
   }
-  code = code.replace(/Lexing.from_channel/g, 'Lexing.LexBuffer<char>.FromTextReader');
-  code = code.replace(/Lexing.from_string/g, 'Lexing.LexBuffer<char>.FromString');
+  code = code.replace(/Lexing\.from_channel/g, 'Lexing.LexBuffer<char>.FromTextReader');
+  code = code.replace(/Lexing\.from_string/g, 'Lexing.LexBuffer<char>.FromString');
   code = code.replace(/open Lexing/, 'open Microsoft.FSharp.Text.Lexing');
   code = code.replace('Lexing.lexeme_start_p', 'lexeme_start_p');
+
+  code = code.replace('Lexing.lexeme lexbuf', 'lexbuf.Lexeme');
+  code = code.replace('lexbuf.lex_curr_p', 'lexbuf.EndPos');
+  code = code.replace('curr.pos_cnum - curr.pos_bol', 'curr.Column');
+  code = code.replace('curr.pos_lnum', 'curr.Line');
+  code = code.replace('+ tok +', '+ string tok +');
 
   // modules
   if (filename != 'Program.ml' && filename.slice(-3) == '.ml') {

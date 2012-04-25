@@ -8,6 +8,9 @@ let incr_lineno lexbuf =
       pos_lnum = pos.pos_lnum + 1;
       pos_bol = pos.pos_cnum;
     }
+    
+let lineno lexbuf =
+  (Lexing.lexeme_start_p lexbuf).pos_lnum
 }
 
 rule token = parse
@@ -83,7 +86,7 @@ and comment = parse
  | [^ '\n']
      { comment lexbuf }
  | eof
-     { failwith ("Unterminated comment on line " ^ string_of_int( Lexing.lexeme_start_p lexbuf).pos_lnum) }
+     { failwith ("Unterminated comment on line " ^ string_of_int (lineno lexbuf)) }
 
 and line_comment = parse
   | '\n'

@@ -81,11 +81,11 @@ setType:
 | id LSQUARE INT_LITERAL RSQUARE                            { T_Set (T_Class $1, $3, $3) } /* move to finiteType once var-card */
 
 classDecl:
-  abstract CLASS id EXTENDS id memberDeclBlock  { G_Class { name=$3; super=Some $5; members=$6; abstract=$1 } }
-| abstract CLASS id memberDeclBlock             { G_Class { name=$3; super=None; members=$4; abstract=$1 } }
+  isAbstract CLASS id EXTENDS id memberDeclBlock  { G_Class { name=$3; super=Some $5; members=$6; isAbstract=$1 } }
+| isAbstract CLASS id memberDeclBlock             { G_Class { name=$3; super=None; members=$4; isAbstract=$1 } }
 ;
 
-abstract:
+isAbstract:
   ABSTRACT  { true }
 |           { false }
 
