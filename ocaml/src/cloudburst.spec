@@ -23,3 +23,4 @@ forall s1 in services {
 
 var utilization as int;
 utilization = count (s in services where s.host in enterprise.machines);
+maximize utilization;

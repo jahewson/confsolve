@@ -24,6 +24,7 @@ type state = {
   counts: int StrMap.t;           (* object counts per-class *)
   subclasses: int list StrMap.t;  (* map of superclass names to subclass indices *)
   indexes: int StrMap.t;          (* current index per-class *)
+  maximise_count: int;            (* count of maximise terms *)
   scope: scope;                   (* scope tree *)
   mzn_output: string list;        (* MiniZinc `output` variables *)
   show_counting: bool;            (* debugging - print the object counts *)
@@ -569,22 +570,38 @@ let rec translateGlobalVar var state =
   | _ ->
       let mzn = mzn ^ "var " ^ translateType t state ^ ": " ^ vname ^ ";\n" in
       (mzn, state)
-
-(* translates a class-level constraint *)
+    
+(* translates a class-level constraint *)    
 let translateClassConstraint cls con state =
+  let ccount = string_of_int (count cls.name state) in
   match con with
   | C_Where expr ->
-    let ccount = string_of_int (count cls.name state) in
-    "\nconstraint\n  forall (i in 1.." ^ ccount ^ ") (\n    " ^ translateExpr expr state ^ "\n  );\n"
-  | C_Maximise expr -> raise (NotImplemented "class-level maximise") (* TODO *)
+      let mzn =
+        "\nconstraint\n  forall (i in 1.." ^ ccount ^ ") (\n    " ^ translateExpr expr state ^ "\n  );\n"
+      in (mzn, state)
+  | C_Maximise expr ->
+      let state = { state with maximise_count = state.maximise_count + 1 } in
+      let mzn =
+        "\nvar int: cost_" ^ string_of_int state.maximise_count ^ ";\n" ^
+        "constraint\n  cost_" ^ string_of_int state.maximise_count ^ 
+            " = sum (i in 1.." ^ ccount ^ ") (\n    " ^ translateExpr expr state ^ "\n  );\n\n"
+      in (mzn, state)
     
 (* translates a global constraint *)
 let translateGlobalConstraint con state =
   match con with
   | C_Where expr ->
-    (if state.comments then "\n% global" else "") ^
-    "\nconstraint\n  " ^ translateExpr expr state ^ ";\n"
-  | C_Maximise expr -> raise (NotImplemented "global maximise") (* TODO *)
+      let mzn =
+        (if state.comments then "\n% global" else "") ^
+        "\nconstraint\n  " ^ translateExpr expr state ^ ";\n"
+      in (mzn, state)
+  | C_Maximise expr ->
+      let state = { state with maximise_count = state.maximise_count + 1 } in
+      let mzn =
+        (if state.comments then "\n% global" else "") ^
+        "\nvar int: cost_" ^ string_of_int state.maximise_count ^ ";\n" ^
+        "constraint cost_" ^ string_of_int state.maximise_count ^ " = " ^ translateExpr expr state ^ ";\n\n"
+      in (mzn, state)
 
 (* translates a class *)
 let rec translateClassBody cls clsSuper mzn state =
@@ -592,7 +609,7 @@ let rec translateClassBody cls clsSuper mzn state =
     let (mzn', state) =
       match mbr with
       | M_Var var -> translateMemberVar cls var state
-      | M_Constraint con -> translateClassConstraint cls con state, state in
+      | M_Constraint con -> translateClassConstraint cls con state in
     (mzn  ^ mzn', state)
   ) (mzn, state) clsSuper.members
 
@@ -611,7 +628,7 @@ and translateClass cls state =
     | None -> (mzn, state))
   in
   (* current class *)
-  let mzn = mzn ^ "\n% own members\n" in
+  let mzn = mzn ^ if state.comments then "\n% own members\n" else "" in
   let (mzn, state) = translateClassBody cls cls mzn state in
   (mzn, popScope state)
 
@@ -622,7 +639,7 @@ let translateModel state =
       match d with
       | G_Var var -> translateGlobalVar var state
       | G_Class cls -> translateClass cls state
-      | G_Constraint con -> (translateGlobalConstraint con state, state) in
+      | G_Constraint con -> translateGlobalConstraint con state in
     (mzn  ^ mzn', state)
   ) ("", state) state.model.declarations
 
@@ -634,7 +651,7 @@ let toMiniZinc csModel showCounting hasComments =
   let scope = { parent = None; node = S_Global} in
   let state = { counts = StrMap.empty; indexes = StrMap.empty; model = csModel; 
                 scope = scope; subclasses = StrMap.empty; show_counting = showCounting; 
-                mzn_output = []; comments = hasComments } in
+                mzn_output = []; comments = hasComments; maximise_count = 0 } in
   let state = countModel state in
   if showCounting then
     (printCounts state;
@@ -642,7 +659,20 @@ let toMiniZinc csModel showCounting hasComments =
   else
     (* 2nd pass: translate to MiniZinc *)
     let (mzn, state) = translateModel state in
-    mzn ^ "\nsolve satisfy;\n\n"
+    let solve =
+      if state.maximise_count = 0 then
+        "satisfy" 
+      else
+        "maximize " ^
+          List.fold_left (fun acc elem ->
+            let vname = "cost_" ^ string_of_int elem in
+            if String.length acc = 0 then
+              vname
+            else
+              acc ^ " + " ^ vname
+          ) "" (seq 1 state.maximise_count)
+    in
+    mzn ^ "\nsolve " ^ solve ^ ";\n\n"
         ^ "output ["
         ^ (listToMz state.mzn_output)
         ^ "];"
