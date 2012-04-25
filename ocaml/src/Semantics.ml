@@ -58,7 +58,7 @@ let resolveClass name state =
     | G_Class c -> c
     | _ -> raise (ExpectedClass name)
   with
-  | Not_found -> raise (ClassNotDefined name)   (* TODO: line numbers *)
+  | Not_found -> raise (ClassNotDefined name)
   
 (* resolves a global variable symbol *)
 let resolveGlobalVar name state =
@@ -74,7 +74,7 @@ let resolveGlobalVar name state =
   in
   match res with
   | Some v -> v
-  | None -> raise (VarNotDefined name)    (* TODO: line numbers *)
+  | None -> raise (VarNotDefined name)
 
 (* resolves a class-level variable symbol *)
 let rec actualResolveMemberVar cls name state =
@@ -100,7 +100,7 @@ let rec actualResolveMemberVar cls name state =
 let strictResolveMemberVar cls name state =
   match actualResolveMemberVar cls name state with
   | (Some v, c) -> (v, c)
-  | (None, _) -> raise (MemberVarNotDefined (name, cls.name))    (* TODO: line numbers *)
+  | (None, _) -> raise (MemberVarNotDefined (name, cls.name))
     
 (* resolves a class-level variable symbol, with global fallback,
    returning both the variable and class which defined it *)
@@ -216,7 +216,7 @@ and resolveFieldAccess expr fname state =
 and elementType t name =
   match t with
   | T_Set (t', _, _) -> t'
-  | _ -> raise (ExpectedSet2 name) (* TODO: really this error message sould refer to the 'collection' expression, not the variable *)
+  | _ -> raise (ExpectedSet2 name)
 
 (* resolves an expression-level variable symbol, with member/global fallback *)
 and resolveExprVar expr name state =
@@ -308,7 +308,7 @@ let rec countObj cls state =
 let rec countVarDecl var state =
   match snd var with
   | T_Class cname ->
-      if state.show_counting then print_endline (fst var ^ ": " ^ cname) else ignore 0;
+      if state.show_counting then print_endline (fst var ^ ": " ^ cname) else ();
       let cls = resolveClass cname state in
       let state = countObj cls state in
       List.fold_left (fun state mbr ->
@@ -317,7 +317,7 @@ let rec countVarDecl var state =
         | _ -> state
       ) state cls.members
   | T_Set (T_Class cname, lbound, ubound) ->
-      if state.show_counting then print_endline (fst var ^ ": " ^ cname ^ "[" ^ string_of_int ubound ^ "]") else ignore 0;
+      if state.show_counting then print_endline (fst var ^ ": " ^ cname ^ "[" ^ string_of_int ubound ^ "]") else ();
       let cls = resolveClass cname state in
       List.fold_left (fun state elem ->
         let state = countObj cls state in
@@ -395,7 +395,7 @@ let rec translateType t state =
   | T_Range (m, n) -> string_of_int m ^ ".." ^ string_of_int n
    | T_Class cname ->
       let cls = (resolveClass cname state) in
-      if cls.abstract then raise (AbstractInstance (cls.name)) else ignore 0;
+      if cls.abstract then raise (AbstractInstance (cls.name)) else ();
       "1.." ^ string_of_int (count cname state)
   | T_Ref cname ->
       let cls = (resolveClass cname state) in
@@ -592,7 +592,7 @@ let rec translateClassBody cls clsSuper mzn state =
     let (mzn', state) =
       match mbr with
       | M_Var var -> translateMemberVar cls var state
-      | M_Constraint con -> ("", state) (*translateClassConstraint cls con state, state DEBUG*) in
+      | M_Constraint con -> ("", state) (translateClassConstraint cls con state, state DEBUG*) in
     (mzn  ^ mzn', state)
   ) (mzn, state) clsSuper.members
 
@@ -606,8 +606,7 @@ and translateClass cls state =
         let super = (resolveClass cname state) in
         if not super.abstract then
           raise (NotImplemented ("`" ^ cls.name ^ "` inherits non-abstract class `" ^ cname ^ "`"))
-        else
-          ignore 0;
+        else ();
         (mzn, state)
     | None -> (mzn, state))
   in
