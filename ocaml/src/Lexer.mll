@@ -69,6 +69,7 @@ rule token = parse
  | "abstract"       { ABSTRACT }
  
  | "maximize"       { MAXIMIZE }
+ | "minimize"       { MINIMIZE }
  
  | ['a'-'z' 'A'-'Z' '0'-'9']['a'-'z' 'A'-'Z' '0'-'9' '_']* { ID(Lexing.lexeme_start_p lexbuf, lexeme lexbuf) }
  | ';'              { SEMICOLON }

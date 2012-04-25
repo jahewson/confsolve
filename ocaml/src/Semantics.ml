@@ -582,8 +582,8 @@ let translateClassConstraint cls con state =
   | C_Maximise expr ->
       let state = { state with maximise_count = state.maximise_count + 1 } in
       let mzn =
-        "\nvar int: cost_" ^ string_of_int state.maximise_count ^ ";\n" ^
-        "constraint\n  cost_" ^ string_of_int state.maximise_count ^ 
+        "\nvar int: objective_" ^ string_of_int state.maximise_count ^ ";\n" ^
+        "constraint\n  objective_" ^ string_of_int state.maximise_count ^ 
             " = sum (i in 1.." ^ ccount ^ ") (\n    " ^ translateExpr expr state ^ "\n  );\n\n"
       in (mzn, state)
     
@@ -599,8 +599,8 @@ let translateGlobalConstraint con state =
       let state = { state with maximise_count = state.maximise_count + 1 } in
       let mzn =
         (if state.comments then "\n% global" else "") ^
-        "\nvar int: cost_" ^ string_of_int state.maximise_count ^ ";\n" ^
-        "constraint cost_" ^ string_of_int state.maximise_count ^ " = " ^ translateExpr expr state ^ ";\n\n"
+        "\nvar int: objective_" ^ string_of_int state.maximise_count ^ ";\n" ^
+        "constraint objective_" ^ string_of_int state.maximise_count ^ " = " ^ translateExpr expr state ^ ";\n\n"
       in (mzn, state)
 
 (* translates a class *)
@@ -659,18 +659,30 @@ let toMiniZinc csModel showCounting hasComments =
   else
     (* 2nd pass: translate to MiniZinc *)
     let (mzn, state) = translateModel state in
+    let state =
+      if state.maximise_count > 0 then
+        output "total_objective" state
+      else state
+    in
+    let mzn = mzn ^
+      if state.maximise_count > 0 then
+        "var int: total_objective;\n" ^
+        "constraint total_objective = " ^
+        List.fold_left (fun acc elem ->
+          let vname = "objective_" ^ string_of_int elem in
+          if String.length acc = 0 then
+            vname
+          else
+            acc ^ " + " ^ vname
+        ) "" (seq 1 state.maximise_count)
+        ^ ";\n"
+      else ""
+    in
     let solve =
       if state.maximise_count = 0 then
         "satisfy" 
       else
-        "maximize " ^
-          List.fold_left (fun acc elem ->
-            let vname = "cost_" ^ string_of_int elem in
-            if String.length acc = 0 then
-              vname
-            else
-              acc ^ " + " ^ vname
-          ) "" (seq 1 state.maximise_count)
+        "maximize total_objective"
     in
     mzn ^ "\nsolve " ^ solve ^ ";\n\n"
         ^ "output ["

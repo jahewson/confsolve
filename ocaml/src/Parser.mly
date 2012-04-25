@@ -14,7 +14,7 @@ open ConfSolve
 %token DOT
 %token CLASS EXTENDS ABSTRACT
 %token SEMICOLON
-%token WHERE MAXIMIZE
+%token WHERE MAXIMIZE MINIMIZE
 %token TRUE FALSE
 %token <Lexing.position * string> ID
 %token <int> INT_LITERAL
@@ -119,6 +119,7 @@ globalConstraint:
 constr:
   expr            { C_Where $1 }
 | MAXIMIZE expr   { C_Maximise $2 }
+| MINIMIZE expr   { C_Maximise (E_Neg $2) }
 ;
 
 foldKind:
