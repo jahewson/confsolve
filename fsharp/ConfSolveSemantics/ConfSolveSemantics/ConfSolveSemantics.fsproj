@@ -19,10 +19,13 @@
     <Optimize>false</Optimize>
     <Tailcalls>false</Tailcalls>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DefineConstants>TRACE;DEBUG</DefineConstants>
     <WarningLevel>3</WarningLevel>
     <PlatformTarget>x86</PlatformTarget>
     <DocumentationFile>bin\Debug\ConfSolveSemantics.XML</DocumentationFile>
+    <OtherFlags>--nowarn:62</OtherFlags>
+    <StartArguments>cloudburst.spec</StartArguments>
+    <UseVSHostingProcess>false</UseVSHostingProcess>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x86' ">
     <DebugType>pdbonly</DebugType>
@@ -33,24 +36,38 @@
     <WarningLevel>3</WarningLevel>
     <PlatformTarget>x86</PlatformTarget>
     <DocumentationFile>bin\Release\ConfSolveSemantics.XML</DocumentationFile>
+    <OtherFlags>--nowarn:62</OtherFlags>
   </PropertyGroup>
+  <Import Project="$(MSBuildExtensionsPath32)\FSharp\1.0\Microsoft.FSharp.Targets" Condition="!Exists('$(MSBuildBinPath)\Microsoft.Build.Tasks.v4.0.dll')" />
+  <Import Project="$(MSBuildExtensionsPath32)\..\Microsoft F#\v4.0\Microsoft.FSharp.Targets" Condition=" Exists('$(MSBuildBinPath)\Microsoft.Build.Tasks.v4.0.dll')" />
+  <Import Project="$(MSBuildExtensionsPath)\FSharp\1.0\FSharp.PowerPack.Targets" />
   <ItemGroup>
+    <Compile Include="ConfSolve.fs" />
+    <Compile Include="Semantics.fs" />
+    <FsYacc Include="Parser.fsy">
+      <OtherFlags>--module Parser</OtherFlags>
+    </FsYacc>
+    <Compile Include="Parser.fs">
+      <Link>Parser.fs</Link>
+    </Compile>
+    <FsLex Include="Lexer.fsl">
+      <OtherFlags>--unicode --lexlib Microsoft.FSharp.Text.Lexing</OtherFlags>
+      <Link>Lexer.fsl</Link>
+    </FsLex>
+    <Compile Include="Lexer.fs">
+      <Link>Lexer.fs</Link>
+    </Compile>
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="FSharp.PowerPack" />
+    <Reference Include="FSharp.PowerPack.Compatibility" />
     <Reference Include="mscorlib" />
     <Reference Include="FSharp.Core" />
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
-    <Reference Include="Microsoft.FSharp.PowerPack" />
   </ItemGroup>
-  <ItemGroup>
-    <Compile Include="ConfSolve.fs" />
-    <Compile Include="Semantics.fs" />
-    <Compile Include="Parser.fs" />
-    <Compile Include="Lexer.fs" />
-    <Compile Include="Program.fs" />
-  </ItemGroup>
-  <Import Project="$(MSBuildExtensionsPath32)\FSharp\1.0\Microsoft.FSharp.Targets" Condition="!Exists('$(MSBuildBinPath)\Microsoft.Build.Tasks.v4.0.dll')" />
-  <Import Project="$(MSBuildExtensionsPath32)\..\Microsoft F#\v4.0\Microsoft.FSharp.Targets" Condition=" Exists('$(MSBuildBinPath)\Microsoft.Build.Tasks.v4.0.dll')" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
 	     Other similar extension points exist, see Microsoft.Common.targets.
 	<Target Name="BeforeBuild">

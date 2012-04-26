@@ -73,7 +73,7 @@ files.forEach(function(filename) {
   code = code.replace(/Debug.printToken/g, 'printfn "%A"');
   
   // exceptions
-  code = code.replace(/Not_found/, ':? System.IndexOutOfRangeException');
+  code = code.replace(/Not_found/, ':? System.Collections.Generic.KeyNotFoundException');
   
   // StrMap
   code = code.replace(/module StrMap = .*/, "");
