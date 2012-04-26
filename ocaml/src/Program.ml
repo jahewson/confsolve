@@ -42,22 +42,24 @@ let main () =
     if !showTokens then
       printTokens lexbuf
     else
-      try
-        let ast = Parser.model Lexer.token lexbuf in
-        if !showAst then
-          Debug.printAst ast
-        else
-          let mz = Semantics.toMiniZinc ast !showCounting !hasComments in
-          print_endline mz
-      with
-      | Parsing.Parse_error ->
-        let tok = Lexing.lexeme lexbuf in
-        let curr = lexbuf.lex_curr_p in
-        let cnum = curr.pos_cnum - curr.pos_bol in
-        let line = curr.pos_lnum in
-        print_endline ("File \"" ^ !filename ^ "\", line " ^ string_of_int line ^ " character " ^ string_of_int cnum ^
-                       ":\nError: Syntax error at `" ^ tok ^ "`");
-        exit 1
+      let ast =
+        try
+          Parser.model Lexer.token lexbuf
+        with
+        | Parsing.Parse_error ->
+          let tok = Lexing.lexeme lexbuf in
+          let curr = lexbuf.lex_curr_p in
+          let cnum = curr.pos_cnum - curr.pos_bol in
+          let line = curr.pos_lnum in
+          print_endline ("File \"" ^ !filename ^ "\", line " ^ string_of_int line ^ " character " ^ string_of_int cnum ^
+                         ":\nError: Syntax error at `" ^ tok ^ "`");
+          exit 1
+        in
+          if !showAst then
+            Debug.printAst ast
+          else
+            let mz = Semantics.toMiniZinc ast !showCounting !hasComments in
+            print_endline mz
       ;;
       
 main();;
