@@ -118,7 +118,7 @@ let rec typeToString (t: _type) =
   | T_Range(m,n) -> string_of_int m ^ ".." ^ string_of_int n
   | T_Class(c) -> c
   | T_Ref(r) -> "ref " ^ r
-  | T_Set(t, lbound, ubound) -> typeToString t ^ "[" ^ string_of_int lbound ^ "," ^ string_of_int ubound ^ "]"
+  | T_Set(t, lbound, ubound) -> typeToString t ^ "[" ^ string_of_int lbound ^ ".." ^ string_of_int ubound ^ "]"
 
 (* determines the type of an expression *)
 let rec typeof expr state =
@@ -285,7 +285,6 @@ let count cname state =
   with
   | Not_found -> 0
   
-  
 (* add a subclass of `super` *)
 let addSubclass super sub state =
   { state with
@@ -295,14 +294,21 @@ let addSubclass super sub state =
         else
           StrMap.add super (sub :: []) state.subclasses
   }
-    
+ 
+(* get the root class of a subclass *)
+let rec rootClass cls state =
+  match cls.super with
+  | Some cname -> rootClass (resolveClass cname state) state
+  | None -> cls
+  
 (* increment object count *)
 let rec countObj cls state =
-  let state = { state with counts = incr cls.name state.counts } 
+  let state = { state with counts = incr cls.name state.counts } in
+  let state = { state with counts = incr (rootClass cls state).name state.counts }
   in
   match cls.super with
   | Some sname ->
-    let id = count cls.name state in
+    let id = count (rootClass cls state).name state in
     let state = addSubclass sname id state in
     countObj (resolveClass sname state) state
   | None -> state
@@ -383,20 +389,22 @@ let intListToMz list =
   if isContiguous list then
     string_of_int (List.hd list) ^ ".." ^ string_of_int (List.nth list ((List.length list) - 1))
   else
-    List.fold_left (fun mzn elem ->
-      if String.length mzn = 0 then
-        string_of_int elem
-      else
-        mzn ^ "," ^ string_of_int elem
-    ) "" list
-  
+    "{" ^
+      List.fold_left (fun mzn elem ->
+        if String.length mzn = 0 then
+          string_of_int elem
+        else
+          mzn ^ "," ^ string_of_int elem
+      ) "" list
+    ^ "}"
+
 (* translates a type *)
 let rec translateType t state =
   match t with
   | T_Int -> "int"
   | T_Bool -> "bool"
   | T_Range (m, n) -> string_of_int m ^ ".." ^ string_of_int n
-   | T_Class cname ->
+  | T_Class cname ->
       let cls = (resolveClass cname state) in
       if cls.isAbstract then raise (AbstractInstance (cls.name)) else ();
       "1.." ^ string_of_int (count cname state)
