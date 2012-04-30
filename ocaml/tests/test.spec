@@ -5,12 +5,12 @@ var x as bool;
 var y as C[3];
 var s as 1..5[2];
 
-class B extends C2 {
+class B {
   var x as 1..10;
   x > 3;
 }
   
-class C : C2 {
+class C {
   var mv as int; 
   var mc as B;
   var md as B;

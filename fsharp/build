@@ -2,7 +2,8 @@
 # the F# is automatically generated from the OCaml source
 set -e -x
 cd ConfSolveSemantics/ConfSolveSemantics
-cp ../../../ocaml/src/*.spec bin/Debug
+cp ../../../ocaml/examples/*.spec bin/Debug
+cp ../../../ocaml/tests/*.spec bin/Debug
 ../../ocaml-to-fsharp
 fsyacc Parser.fsy --module Parser
 fslex Lexer.fsl --unicode

@@ -4,7 +4,8 @@ set -e
 mkdir -p bin
 cd bin
 cp ../src/*.ml* ./
-cp ../src/*.spec* ./
+cp ../examples/*.spec* ./
+cp ../tests/*.spec* ./
 
 ocamlc -i ConfSolve.ml > ConfSolve.mli
 ocamlc -c ConfSolve.mli
