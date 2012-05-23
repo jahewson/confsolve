@@ -40,7 +40,6 @@ exception VarNotDefined of string                   (* variable not defined *)
 exception MemberVarNotDefined of string * string    (* member variable not defined (name, class) *)
 exception EnumMemberNotDefined of string * string   (* enum member not defined *)
 exception ExpectedType of string                    (* expected a type *)
-exception ExpectedClass of string                   (* expected a class *)
 exception ExpectedSet1 of string                    (* expected a set *)
 exception ExpectedSet2 of string                    (* expected a set *)
 exception SetOfSet of string                        (* sets of sets are not permitted *)
@@ -760,7 +759,7 @@ let rec forwardType t state =
       (match resolveSymbol name state with
        | Class cls -> T_Class name
        | Enum enm -> T_Enum name
-       | Constraint _ | Var _ -> raise (ExpectedClass name))  (* TODO: actually ExpectedType *)
+       | Constraint _ | Var _ -> raise (ExpectedType name))
   | T_Set (t, lb, ub) ->
       T_Set (forwardType t state, lb, ub)
   | _ -> t
