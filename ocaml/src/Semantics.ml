@@ -391,16 +391,19 @@ let printCounts state =
 
 (* translation ********************************************************************)
 
-(* get the object-count for class `cls` *)
-let count cname state =
-  let cname = (rootClass (resolveClass cname state) state).name
-  in
+(* get the object-count for `cls` *)
+let rawCount cname state =
   try
     StrMap.find cname state.counts
   with
   | Not_found -> 0
+
+(* get the object-count for root(`cls`) *)
+let count cname state =
+  let cname = (rootClass (resolveClass cname state) state).name in
+  rawCount cname state
   
-(* generates a new index for an object *)
+(* generates a new index for an object of type root(`cls`) *)
 let newIndex cname state =
   let cname = (rootClass (resolveClass cname state) state).name
   in
@@ -699,22 +702,25 @@ let rec translateClassBody cls clsSuper mzn state =
 
 (* translates a class *)
 and translateClass cls state =
-  let state = pushScope (S_Class cls) state in
-  let mzn = if state.comments then "\n% class " ^ cls.name ^ "\n" else "" in
-  let (mzn, state) =
-    (match cls.super with
-    | Some cname ->
-        let super = (resolveClass cname state) in
-        if not super.isAbstract then
-          raise (NotImplemented ("`" ^ cls.name ^ "` inherits non-abstract class `" ^ cname ^ "`"))
-        else ();
-        (mzn, state)
-    | None -> (mzn, state))
-  in
-  (* current class *)
-  let mzn = mzn ^ if state.comments then "\n% own members\n" else "" in
-  let (mzn, state) = translateClassBody cls cls mzn state in
-  (mzn, popScope state)
+  if rawCount cls.name state = 0 then
+    ("", state)
+  else
+    let state = pushScope (S_Class cls) state in
+    let mzn = if state.comments then "\n% class " ^ cls.name ^ "\n" else "" in
+    let (mzn, state) =
+      (match cls.super with
+      | Some cname ->
+          let super = (resolveClass cname state) in
+          if not super.isAbstract then
+            raise (NotImplemented ("`" ^ cls.name ^ "` inherits non-abstract class `" ^ cname ^ "`"))
+          else ();
+          (mzn, state)
+      | None -> (mzn, state))
+    in
+    (* current class *)
+    let mzn = mzn ^ if state.comments then "\n% own members\n" else "" in
+    let (mzn, state) = translateClassBody cls cls mzn state in
+    (mzn, popScope state)
 
 let translateEnum enm state =
   ("", state)
