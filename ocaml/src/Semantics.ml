@@ -311,6 +311,14 @@ let addSubclass super sub state =
           StrMap.add super (sub :: []) state.subclasses
   }
  
+let getSubclasses cname state =
+  try
+    StrMap.find cname state.subclasses
+  with
+  | Not_found ->
+      print_endline cname;
+      raise Not_found
+ 
 (* get the root class of a subclass *)
 let rec rootClass cls state =
   match cls.super with
@@ -320,10 +328,12 @@ let rec rootClass cls state =
 (* increment object count *)
 let rec countObj cls state =
   let state = { state with counts = incr (rootClass cls state).name state.counts } in
+  let id = getCurCount (rootClass cls state).name state in
+  
+  let state = addSubclass cls.name id state in
+  
   match cls.super with
-  | Some sname ->
-    let id = getCurCount (rootClass cls state).name state in
-    countSuperObj id (resolveClass sname state) state
+  | Some sname -> countSuperObj id (resolveClass sname state) state
   | None -> state
     
 and countSuperObj id cls state =
@@ -335,7 +345,7 @@ and countSuperObj id cls state =
       match cls.super with
       | Some sname ->
         let state = addSubclass sname id state in
-        countObj (resolveClass sname state) state
+        countSuperObj id (resolveClass sname state) state
       | None -> state
     
 (* count objects for a varDecl *)
@@ -452,7 +462,7 @@ let rec translateType t state =
   | T_Ref cname ->
       let cls = (resolveClass cname state) in
       if cls.isAbstract then
-        intListToMz (StrMap.find cname state.subclasses)
+        intListToMz (getSubclasses cname state)
       else
         "1.." ^ string_of_int (count cname state)
   | T_Set (t, lbound, ubound) ->
@@ -646,18 +656,18 @@ let rec translateGlobalVar var state =
     
 (* translates a class-level constraint *)    
 let translateClassConstraint cls con state =
-  let ccount = string_of_int (count cls.name state) in
+  let mzIds = intListToMz (getSubclasses cls.name state) in
   match con with
   | C_Where expr ->
       let mzn =
-        "\nconstraint\n  forall (this in 1.." ^ ccount ^ ") (\n    " ^ translateExpr expr state ^ "\n  );\n"
+        "\nconstraint\n  forall (this in " ^ mzIds ^ ") (\n    " ^ translateExpr expr state ^ "\n  );\n"
       in (mzn, state)
   | C_Maximise expr ->
       let state = { state with maximise_count = state.maximise_count + 1 } in
       let mzn =
         "\nvar int: objective_" ^ string_of_int state.maximise_count ^ ";\n" ^
         "constraint\n  objective_" ^ string_of_int state.maximise_count ^ 
-            " = sum (i in 1.." ^ ccount ^ ") (\n    " ^ translateExpr expr state ^ "\n  );\n\n"
+            " = sum (i in " ^ mzIds ^ ") (\n    " ^ translateExpr expr state ^ "\n  );\n\n"
       in (mzn, state)
     
 (* translates a global constraint *)
