@@ -3,12 +3,14 @@ open Parser
 
 let rec typeToString (t: _type) =
   match t with
+  | T_Symbol s -> "T_Symbol"
   | T_Int -> "T_Int"
   | T_Bool -> "T_Bool"
   | T_Range(m,n) -> "T_Range " ^ string_of_int m ^ ".." ^ string_of_int n
   | T_Class(c) -> "T_Class " ^ c
   | T_Ref(r) -> "T_Ref " ^ r
   | T_Set(t,lbound,ubound) -> "T_Set " ^ typeToString t ^ "[" ^ string_of_int lbound ^ "," ^ string_of_int ubound ^ "]"
+  | T_Enum(e) -> "T_Enum " ^ e
 
 let printClass (c: classDecl) =
   let super =
@@ -20,8 +22,9 @@ let printClass (c: classDecl) =
   ignore (List.fold_left (fun count decl ->
     if count > 0 then print_string "; ";
     (match decl with
-    | M_Var(n,t) -> print_string ("M_Var (\"" ^ n ^ "\", " ^ typeToString(t) ^ ")")
-    | M_Constraint(_) -> print_string "M_CONSTRAINT");
+    | Var(n,t) -> print_string ("Var (\"" ^ n ^ "\", " ^ typeToString(t) ^ ")")
+    | Constraint(_) -> print_string "CONSTRAINT"
+    | _ -> print_string "TODO");
     count + 1) 0 c.members);
   print_string "];}"
 
@@ -30,9 +33,10 @@ let printAst (model: ConfSolve.model) =
   ignore (List.fold_left (fun count decl ->
     if count > 0 then print_string ";\n   ";
     (match decl with
-    | G_Class(c) -> print_string "G_Class "; printClass c
-    | G_Var(n,t) -> print_string ("G_Var (\"" ^ n ^ "\", " ^ typeToString(t) ^ ")")
-    | G_Constraint(_) -> print_string "G_CONSTRAINT");
+    | Class(c) -> print_string "Class "; printClass c
+    | Var(n,t) -> print_string ("Var (\"" ^ n ^ "\", " ^ typeToString(t) ^ ")")
+    | Constraint(_) -> print_string "CONSTRAINT";
+    | Enum(_) -> print_string "ENUM");
     count + 1) 0 model.declarations);
   print_endline "];}"
   

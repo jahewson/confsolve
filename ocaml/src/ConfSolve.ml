@@ -1,14 +1,16 @@
-module StrMap = Map.Make(String)
-
 type className = string
 type fieldName = string
 type varName = string
+type enumName = string
+type enumElement = string
 
 type _type =
+  | T_Symbol of string   (* untyped *)
+  | T_Class of className (* typed *)
+  | T_Enum of enumName   (* typed *)
   | T_Int
   | T_Bool
   | T_Range of int * int
-  | T_Class of className
   | T_Ref of className
   | T_Set of _type * int * int (* lbound, ubound *)
 
@@ -24,7 +26,9 @@ type foldOp =
   | Sum
 
 type expr =
-  | E_Var of varName
+  | E_Symbol of string  (* untyped *)
+  | E_Var of varName    (* typed *)
+  | E_Enum of enumName  (* typed *)
   | E_Access of expr * fieldName
   | E_Op of expr * op * expr
   | E_Card of expr (* e.size *)
@@ -41,22 +45,24 @@ type _constraint =
 
 type varDecl = varName * _type
 
-type memberDecl =
-  | M_Var of varDecl
-  | M_Constraint of _constraint
-
 type classDecl = {
    name: className;
    super: className option;
-   members: memberDecl list;
+   members: decl list;
    isAbstract: bool;
- }
- 
-type globalDecl =
- | G_Class of classDecl
- | G_Var of varDecl
- | G_Constraint of _constraint
+}
 
-type model = {
- declarations: globalDecl list;
+and enumDecl = {
+   enumName: enumName;
+   elements: enumElement list;
+}
+
+and decl =
+ | Class of classDecl
+ | Enum of enumDecl
+ | Var of varDecl
+ | Constraint of _constraint
+ 
+and model = {
+ declarations: decl list;
 }

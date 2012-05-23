@@ -9,12 +9,12 @@ class Server {
 
 class Client {
   var id as int;
-  var moduleule as moduleule;
+  var module as Module;
 }
 
-class moduleule {
+class Module {
   var width as int;
-  var module as ref moduleule;
+  var module as ref Module;
   var widget as ref Widget;
   var multi as ref Widget[2];
 }
@@ -33,16 +33,16 @@ c.id = 3;
 s.client.id = 3;
 
 // obj.obj.int
-c.moduleule.width = 4;
+c.module.width = 4;
 
 // obj.obj.ref
-c.moduleule.module = c.moduleule;
+c.module.module = c.module;
 
 // obj.ref.obj.int
-s.client.moduleule.width = 4;
+s.client.module.width = 4;
 
 // obj.ref.obj.ref.int
-s.client.moduleule.widget.phase = 5;
+s.client.module.widget.phase = 5;
 
 // TODO - it seems that this creates unnessesary object IDs for each set member
 //        because I don't allow array access such as cset[3].id so it has no use.

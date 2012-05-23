@@ -60,7 +60,8 @@ rule token = parse
  | ']'              { RSQUARE }
  
  | '.'              { DOT }
-  
+ | ','              { COMMA }
+ 
  | "var"            { VAR }
  | "as"             { AS }
  | "int"            { INT }
@@ -70,6 +71,7 @@ rule token = parse
  | "class"          { CLASS }
  | "extends"| "inherits" | ":"  { EXTENDS }
  | "abstract"       { ABSTRACT }
+ | "enum"           { ENUM }
  
  | "maximize"       { MAXIMIZE }
  | "minimize"       { MINIMIZE }

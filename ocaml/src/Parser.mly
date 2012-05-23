@@ -11,11 +11,12 @@ open ConfSolve
 %token NOT FORALL EXISTS SUM COUNT IN
 %token SUBSET UNION INTERSECTION
 %token VAR AS INT BOOL REF DOTS
-%token DOT
-%token CLASS EXTENDS ABSTRACT
+%token DOT COMMA
+%token CLASS EXTENDS ABSTRACT ENUM
 %token SEMICOLON
 %token WHERE MAXIMIZE MINIMIZE
 %token TRUE FALSE
+%token THIS
 %token <Lexing.position * string> ID
 %token <int> INT_LITERAL
 %token EOL
@@ -49,12 +50,12 @@ declarationList:
 declaration:
   varDecl   SEMICOLON { $1 }
 | classDecl { $1 }
-/* enum... */
-| globalConstraint SEMICOLON { $1 }
+| enumDecl { $1 }
+| constraint_ SEMICOLON { $1 }
 ;
 
 varDecl:
-  VAR id AS type { G_Var ($2,$4) }
+  VAR id AS type { Var ($2,$4) }
 ;
 
 id:
@@ -64,25 +65,36 @@ id:
 type:
  INT            { T_Int }
 | finiteType    { $1 }
-| id            { T_Class $1 }
 | setType       { $1 }
-/* ... */
 ;
 
 finiteType:
 | BOOL                          { T_Bool }
 | INT_LITERAL DOTS INT_LITERAL  { T_Range ($1, $3) }
 | REF id                        { T_Ref $2 }
+| id                            { T_Symbol $1 } /* may or may not actually be finite */
 ;
 
 setType:
   finiteType LSQUARE INT_LITERAL DOTS INT_LITERAL RSQUARE   { T_Set ($1, $3, $5) }
 | finiteType LSQUARE INT_LITERAL RSQUARE                    { T_Set ($1, $3, $3) }
-| id LSQUARE INT_LITERAL RSQUARE                            { T_Set (T_Class $1, $3, $3) } /* move to finiteType once var-card */
+
+enumDecl:
+  ENUM id LCURLY enumElementList RCURLY  { Enum { enumName=$2; elements=$4 } }
+;
+
+enumElementList:
+| enumElement                        { $1 :: [] }
+| enumElementList COMMA enumElement  { $1 @ [$3] }
+;
+
+enumElement:
+  id  { $1 }
+;
 
 classDecl:
-  isAbstract CLASS id EXTENDS id memberDeclBlock  { G_Class { name=$3; super=Some $5; members=$6; isAbstract=$1 } }
-| isAbstract CLASS id memberDeclBlock             { G_Class { name=$3; super=None; members=$4; isAbstract=$1 } }
+  isAbstract CLASS id EXTENDS id memberDeclBlock  { Class { name=$3; super=Some $5; members=$6; isAbstract=$1 } }
+| isAbstract CLASS id memberDeclBlock             { Class { name=$3; super=None; members=$4; isAbstract=$1 } }
 ;
 
 isAbstract:
@@ -100,23 +112,15 @@ memberDeclList:
 ;
 
 memberDecl:
-| memberVarDecl    { $1 }
-| memberConstraint { $1 }
+| varDecl     { $1 }
+| constraint_ { $1 }
 ;
 
-memberVarDecl:
-  VAR id AS type { M_Var ($2,$4) }
+constraint_:
+  constraintBody    { Constraint $1 }
 ;
 
-memberConstraint:
-  constr    { M_Constraint $1 }
-;
-
-globalConstraint:
-  constr    { G_Constraint $1 }
-;
-
-constr:
+constraintBody:
   expr            { C_Where $1 }
 | MAXIMIZE expr   { C_Maximise $2 }
 | MINIMIZE expr   { C_Maximise (E_Neg $2) }
@@ -136,10 +140,8 @@ count: /* NOTE: parens are needed to avoid shift/reduce conflict */
 | COUNT LPAREN id IN expr RPAREN { E_Fold (Sum, $3, $5, E_Bool true, E_Int 1) }
 
 expr:
-| variable                { $1 }
-/* ... */
+| symbol                  { $1 }
 | binaryExpr              { $1 }
-/* ... */
 | fold                    { $1 }
 | count                   { $1 }
 | SUB expr %prec UMINUS   { E_Neg $2 }
@@ -150,9 +152,9 @@ expr:
 | LPAREN expr RPAREN      { E_Paren $2 }
 ;
 
-variable:
-  id                      { E_Var $1 }
-| variable DOT id         { if $3 = "size" then E_Card $1 else E_Access ($1, $3) }
+symbol:
+  id                      { E_Symbol $1 }
+| symbol DOT id           { if $3 = "size" then E_Card $1 else E_Access ($1, $3) }
 
 binaryExpr:
   expr EQ expr            { E_Op ($1, Eq, $3) }

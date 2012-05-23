@@ -24,7 +24,7 @@ class Datacenter {
    var b as 0..100;
 }
 
-var cloud as ref Datacenter;
+var cloud as Datacenter;
 var enterprise as Datacenter;
 
 var dhcp as DHCP_Service[2];

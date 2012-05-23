@@ -33,9 +33,13 @@ type state = {
 
 (* binding ************************************************************************)
 
+exception SymbolNotDefined of string                (* symbol not defined *)
+exception TypeNotDefined of string                  (* type not defined *)
 exception ClassNotDefined of string                 (* class not defined *)
 exception VarNotDefined of string                   (* variable not defined *)
 exception MemberVarNotDefined of string * string    (* member variable not defined (name, class) *)
+exception EnumMemberNotDefined of string * string   (* enum member not defined *)
+exception ExpectedType of string                    (* expected a type *)
 exception ExpectedClass of string                   (* expected a class *)
 exception ExpectedSet1 of string                    (* expected a set *)
 exception ExpectedSet2 of string                    (* expected a set *)
@@ -45,85 +49,26 @@ exception IncompatibleTypes of string               (* expression of incompatibl
 exception NoInstancesOfClass of string              (* no instances of class for reference to resolve to *)
 exception AbstractInstance of string                (* cannot create an instance of an abstract class *)
 
-(* resolves a class symbol *)
-let resolveClass name state =
-  try
-    let res =
-      List.find (fun decl ->
-        match decl with
-        | G_Class c -> c.name = name
-        | _ -> false
-      ) state.model.declarations
-    in
-    match res with
-    | G_Class c -> c
-    | _ -> raise (ExpectedClass name)
-  with
-  | Not_found -> raise (ClassNotDefined name)
-  
-(* resolves a global variable symbol *)
-let resolveGlobalVar name state =
-  let res = (List.fold_left (fun res decl ->
-    match decl with
-    | G_Var v ->
-      (match res with
-       | Some v -> res
-       | None -> if fst v = name then Some v else None
-      )
-    | _ -> res
-  ) None state.model.declarations)
-  in
-  match res with
-  | Some v -> v
-  | None -> raise (VarNotDefined name)
-
-(* resolves a class-level variable symbol *)
-let rec actualResolveMemberVar cls name state =
-  let mbr =
-    List.fold_left (fun res decl ->
-      match decl with
-      | M_Var v ->
-        (match res with
-         | Some v -> res
-         | None -> if fst v = name then Some v else None
-        )
-      | _ -> res
-    ) None cls.members
-  in
-  match (mbr, cls.super) with
-  | (None, None) 
-  | (Some _, _) -> (mbr, cls)
-  | (None, Some cname) ->
-      let super = (resolveClass cname state) in
-      actualResolveMemberVar super name state
-    
-(* resolves a class-level variable symbol, only *)
-let strictResolveMemberVar cls name state =
-  match actualResolveMemberVar cls name state with
-  | (Some v, c) -> (v, c)
-  | (None, _) -> raise (MemberVarNotDefined (name, cls.name))
-    
-(* resolves a class-level variable symbol, with global fallback,
-   returning both the variable and class which defined it *)
-let resolveMemberVar cls name state =
-  match actualResolveMemberVar cls name state with
-  | (Some v, c) -> (v, c)
-  | (None, c) -> (resolveGlobalVar name state, c)
-    
 (* for reporting compile errors *)
 let rec typeToString (t: _type) =
   match t with
+  | T_Symbol sym -> raise UnexpectedError
   | T_Int -> "int"
   | T_Bool -> "bool"
   | T_Range(m,n) -> string_of_int m ^ ".." ^ string_of_int n
   | T_Class(c) -> c
+  | T_Enum(c) -> c
   | T_Ref(r) -> "ref " ^ r
   | T_Set(t, lbound, ubound) -> typeToString t ^ "[" ^ string_of_int lbound ^ ".." ^ string_of_int ubound ^ "]"
+
+(* types -------------------------------------------------------------------------*)
 
 (* determines the type of an expression *)
 let rec typeof expr state =
   match expr with
+  | E_Symbol sym -> raise UnexpectedError
   | E_Var vname -> snd (resolveVar vname state)
+  | E_Enum ename -> T_Enum ename
   | E_Access (e, fname) -> let (_,v,_) = resolveFieldAccess e fname state in snd (v)
   | E_Op (_, Eq, _) -> T_Bool
   | E_Op (_, Neq, _) -> T_Bool
@@ -203,7 +148,107 @@ and typeOfSetOp e1 op e2 state =
          | _ -> raise UnexpectedError)
     | _ -> raise (IncompatibleTypes (typeToString t1 ^ ", " ^ typeToString t2))
 
-(* resolves both class and field of a field access expression *)
+(* returns the element type of a collection *)
+and elementType t name =
+  match t with
+  | T_Set (t', _, _) -> t'
+  | _ -> raise (ExpectedSet2 name)
+
+(* scope -------------------------------------------------------------------------*)
+
+(* pushes a scope to the state *)
+and pushScope node state =
+  { state with scope = { parent = Some state.scope; node = node; } }
+
+(* pops a scope from the state *)
+and popScope state =
+  match state.scope.parent with
+  | Some parent -> { state with scope = parent }
+  | None -> raise UnexpectedError
+
+(* resolution ---------------------------------------------------------------------*)
+  
+(* resolve global symbol *)
+and resolveGlobalSymbol name state =
+  let found = List.fold_left (fun found decl ->
+    match found with
+    | Some _ -> found
+    | None ->
+        match decl with
+        | Var (vname, t) -> if vname = name then Some decl else None
+        | Enum enm -> if enm.enumName = name then Some decl else None
+        | Class cls -> if cls.name = name then Some decl else None
+        | Constraint _ -> found
+  ) None state.model.declarations
+  in
+  match found with
+  | Some f -> f
+  | None -> raise (SymbolNotDefined name)
+  
+(* resolves a class-level symbol, returning both the variable and class which defined it *)
+and resolveMemberSymbolImpl noGlobal cls name state =
+  if name = "this" then
+    (Var ("this", T_Class cls.name), Some cls)
+  else
+    let found = List.fold_left (fun found mbr ->
+      match found with
+      | Some _ -> found
+      | None ->
+          match mbr with
+          | Var (vname, t) -> if vname = name then Some mbr else None
+          | Constraint _ -> found
+          | Enum _ | Class _ -> raise UnexpectedError
+    ) None cls.members
+    in
+    match found with
+    | Some mbr -> (mbr, Some cls)
+    | None ->
+        match cls.super with
+        | Some cname -> resolveMemberSymbolImpl noGlobal (resolveClass cname state) name state
+        | None ->
+          if noGlobal then
+            raise (SymbolNotDefined name)
+          else
+            (resolveGlobalSymbol name (popScope state), None)
+
+(* resolve a member symbol *)
+and resolveMemberSymbol cls name state =
+  resolveMemberSymbolImpl false cls name state
+  
+(* resolve a member symbol, with no global fallback *)
+and resolveMemberSymbolOnly cls name state =
+  resolveMemberSymbolImpl true cls name state
+
+(* resolve expression-level symbol *)
+and resolveExprSymbol vname collection name state =
+  if vname = name then
+    Var (name, elementType (typeof collection state) name)
+  else
+   resolveSymbol name (popScope state)
+    
+(* resolve any symbol *)
+and resolveSymbol name state =
+  match state.scope.node with
+  | S_Global -> resolveGlobalSymbol name state
+  | S_Class cls -> fst (resolveMemberSymbol cls name state)
+  | S_Expr (E_Fold (_, vname, collection, _, _)) -> resolveExprSymbol vname collection name state
+  | S_Expr _ -> raise UnexpectedError
+  
+(* resolution helpers -------------------------------------------------------------------*)
+  
+(* resolve an enum *)
+and resolveEnum name state =
+  match resolveGlobalSymbol name state with
+  | Enum enm -> enm
+  | _ -> raise UnexpectedError
+  
+(* resolve a variable *)
+and resolveVar name state =
+  match resolveSymbol name state with
+  | Var var -> var
+  | _ -> raise UnexpectedError
+    
+(* resolve a field access *)
 and resolveFieldAccess expr fname state =
   let cls = 
     match typeof expr state with
@@ -211,54 +256,25 @@ and resolveFieldAccess expr fname state =
     | T_Class cname -> resolveClass cname state
     | _ -> raise (InvalidFieldAccess (fname, typeToString (typeof expr state)))
   in
-  let r = strictResolveMemberVar cls fname state in
-  (snd(r), fst(r), snd(r))
-
-(* returns the element type of a collection *)
-and elementType t name =
-  match t with
-  | T_Set (t', _, _) -> t'
-  | _ -> raise (ExpectedSet2 name)
-
-(* resolves an expression-level variable symbol, with member/global fallback *)
-and resolveExprVar expr name state =
-  let res = 
-    match expr with
-    | E_Fold (op, vname, collection, where, body) ->
-      if vname = name then
-        Some collection
-      else
-        None
+  let r =
+    match resolveMemberSymbolOnly cls fname state with
+    | (Var var, Some cls) -> (var, cls)
     | _ -> raise UnexpectedError
   in
-  match res with
-  | Some collection -> (name, elementType (typeof collection state) name)
-  | None ->
-    match state.scope.node with
-     | S_Global -> resolveGlobalVar name state
-     | S_Class cls -> fst (resolveMemberVar cls name state)
-     | S_Expr expr -> 
-        resolveExprVar expr name { state with scope = match state.scope.parent with
-                                                      | Some s -> s
-                                                      | None -> raise UnexpectedError }
+  (snd(r), fst(r), snd(r))
 
-(* resolves any variable symbol *)
-and resolveVar name state =
-  match state.scope.node with
-  | S_Global -> resolveGlobalVar name state
-  | S_Class cls -> fst (resolveMemberVar cls name state)
-  | S_Expr expr -> resolveExprVar expr name state 
+(* resolve a member variable to a (var, class) *)
+and resolveMemberVar cls name state =
+  match resolveMemberSymbol cls name state with
+  | (Var var, Some cls) -> (var, cls)
+  | _ -> raise UnexpectedError
 
-(* pushes a scope to the state *)
-let pushScope node state =
-  { state with scope = { parent = Some state.scope; node = node; } }
-    
-(* pops a scope from the state *)
-let popScope state =
-  match state.scope.parent with
-  | Some parent -> { state with scope = parent }
-  | None -> raise UnexpectedError
-  
+(* resolve a class *)
+and resolveClass name state =
+  match resolveGlobalSymbol name state with
+  | Class c -> c
+  | _ -> raise UnexpectedError
+
 (* counting ***********************************************************************)
 
 (* generates a list of integers min..max *)
@@ -273,13 +289,14 @@ let seq min max =
 
 (* increment count of key in lst *)
 let incr key lst =
+  (*print_endline ("+1 " ^ key);*)
   if StrMap.mem key lst then
     StrMap.add key ((StrMap.find key lst) + 1) lst
   else
     StrMap.add key 1 lst
 
-(* get the object-count for class `cls` *)
-let count cname state =
+(* get the current object-count for class `cls` *)
+let getCurCount cname state =
   try
     StrMap.find cname state.counts
   with
@@ -303,38 +320,48 @@ let rec rootClass cls state =
   
 (* increment object count *)
 let rec countObj cls state =
-  let state = { state with counts = incr cls.name state.counts } in
-  let state = { state with counts = incr (rootClass cls state).name state.counts }
-  in
+  let state = { state with counts = incr (rootClass cls state).name state.counts } in
   match cls.super with
   | Some sname ->
-    let id = count (rootClass cls state).name state in
-    let state = addSubclass sname id state in
-    countObj (resolveClass sname state) state
+    let id = getCurCount (rootClass cls state).name state in
+    countSuperObj id (resolveClass sname state) state
   | None -> state
     
+and countSuperObj id cls state =
+    let root = rootClass cls state in
+    if root = cls then
+      addSubclass root.name id state
+    else
+      let state = { state with counts = incr cls.name state.counts } in
+      match cls.super with
+      | Some sname ->
+        let state = addSubclass sname id state in
+        countObj (resolveClass sname state) state
+      | None -> state
+    
 (* count objects for a varDecl *)
-let rec countVarDecl var state =
+let rec countVarDecl var state =      (* BUG: this seems to not be counting fields from the superclass? *)
   match snd var with
   | T_Class cname ->
-      if state.show_counting then print_endline (fst var ^ ": " ^ cname) else ();
+      if state.show_counting then print_endline ("\n" ^ fst var ^ ": " ^ cname) else ();
       let cls = resolveClass cname state in
+      if cls.isAbstract then raise (AbstractInstance ((fst var) ^ ": " ^ cname)) else ();
       let state = countObj cls state in
       List.fold_left (fun state mbr ->
         match mbr with
-        | M_Var v -> countVarDecl v state
-        | _ -> state
-      ) state cls.members
+        | Var v -> countVarDecl v state
+        | _ -> state 
+      ) state cls.members (* TODO: does this count inherited fields? *)
   | T_Set (T_Class cname, lbound, ubound) ->
-      if state.show_counting then print_endline (fst var ^ ": " ^ cname ^ "[" ^ string_of_int ubound ^ "]") else ();
+      if state.show_counting then print_endline ("\n" ^ fst var ^ ": " ^ cname ^ "[" ^ string_of_int ubound ^ "]") else ();
       let cls = resolveClass cname state in
       List.fold_left (fun state elem ->
         let state = countObj cls state in
         List.fold_left (fun state mbr ->
           match mbr with
-          | M_Var v -> countVarDecl v state
+          | Var v -> countVarDecl v state
           | _ -> state
-        ) state cls.members
+        ) state cls.members (* TODO: does this count inherited fields? *)
       ) state (seq 1 ubound)
   | _ -> state
 
@@ -342,24 +369,36 @@ let rec countVarDecl var state =
 let countModel state =
   List.fold_left (fun state d ->
     match d with
-    | G_Var v -> countVarDecl v state
+    | Var v -> countVarDecl v state
     | _ -> state
   ) state state.model.declarations
     
 (* for debugging *)
 let printCounts state =
+  print_endline "\n------------\n";
   StrMap.iter (fun k v ->
     Printf.printf "%s: %d\n" k v
   ) state.counts
 
 (* translation ********************************************************************)
 
+(* get the object-count for class `cls` *)
+let count cname state =
+  let cname = (rootClass (resolveClass cname state) state).name
+  in
+  try
+    StrMap.find cname state.counts
+  with
+  | Not_found -> 0
+  
 (* generates a new index for an object *)
 let newIndex cname state =
+  let cname = (rootClass (resolveClass cname state) state).name
+  in
   let indexes' = incr cname state.indexes in
   let str = string_of_int (StrMap.find cname indexes') in
   (str, { state with indexes = indexes' })
-
+    
 (* generates a list of `num` new indices *)
 let newIndices cname num state =
   let rec next i indices state =
@@ -401,6 +440,7 @@ let intListToMz list =
 (* translates a type *)
 let rec translateType t state =
   match t with
+  | T_Symbol sym -> raise UnexpectedError
   | T_Int -> "int"
   | T_Bool -> "bool"
   | T_Range (m, n) -> string_of_int m ^ ".." ^ string_of_int n
@@ -408,6 +448,8 @@ let rec translateType t state =
       let cls = (resolveClass cname state) in
       if cls.isAbstract then raise (AbstractInstance (cls.name)) else ();
       "1.." ^ string_of_int (count cname state)
+  | T_Enum ename ->
+      "1.." ^ string_of_int (List.length (resolveEnum ename state).elements)
   | T_Ref cname ->
       let cls = (resolveClass cname state) in
       if cls.isAbstract then
@@ -441,15 +483,37 @@ let translateOp op =
 (* translates an expression *)
 let rec translateExpr expr state =
   match expr with
+  | E_Symbol sym -> raise UnexpectedError
+  
   | E_Var vname ->
       ignore (resolveVar vname state);
       (match state.scope.node with
        | S_Global -> vname
        | S_Class cls ->
            let (_, clsDecl) = resolveMemberVar cls vname state in
-           clsDecl.name ^ "_" ^ vname ^ "[i]"
+           if vname = "this" then
+            "this"
+           else
+             clsDecl.name ^ "_" ^ vname ^ "[this]"
        | S_Expr e -> vname)
 
+  | E_Access (E_Enum ename, mname) ->
+      let enm = resolveEnum ename state in
+      let (_, idx) = 
+        List.fold_left (fun (i, found) elem ->
+          if elem = mname then
+            (i + 1, i)
+          else
+            (i + 1, found)
+        ) (1, -1) enm.elements
+      in
+      if idx = -1 then
+        raise (EnumMemberNotDefined (ename, mname))
+      else
+        string_of_int idx
+      
+  | E_Enum _ ->
+      ""
   | E_Access (e, mname) ->
       let (cls, (_,mbr), clsDecl) = resolveFieldAccess e mname state in
       cls.name ^ "_" ^ mname ^ "[" ^ translateExpr e state ^ "]"
@@ -548,7 +612,7 @@ let translateMemberVar cls var state =
   | T_Set (_, lbound, ubound) ->
       let mzn = mzn ^ "var " ^ translateType t state ^ ": " ^ cls.name ^ "_" ^ vname ^ ";\n" in
       let expr = cardConstraint vname lbound ubound state in
-      let mzn = mzn ^ "constraint forall (i in 1.." ^ string_of_int ccount ^ ") (" ^ translateExpr expr state ^ ");\n" in
+      let mzn = mzn ^ "constraint forall (this in 1.." ^ string_of_int ccount ^ ") (" ^ translateExpr expr state ^ ");\n" in
       (mzn, state)
   | _ ->
       let mzn = mzn ^ "var " ^ translateType t state ^ ": " ^ cls.name ^ "_" ^ vname ^ ";\n" in
@@ -587,7 +651,7 @@ let translateClassConstraint cls con state =
   match con with
   | C_Where expr ->
       let mzn =
-        "\nconstraint\n  forall (i in 1.." ^ ccount ^ ") (\n    " ^ translateExpr expr state ^ "\n  );\n"
+        "\nconstraint\n  forall (this in 1.." ^ ccount ^ ") (\n    " ^ translateExpr expr state ^ "\n  );\n"
       in (mzn, state)
   | C_Maximise expr ->
       let state = { state with maximise_count = state.maximise_count + 1 } in
@@ -618,8 +682,9 @@ let rec translateClassBody cls clsSuper mzn state =
   List.fold_left (fun (mzn, state) mbr ->
     let (mzn', state) =
       match mbr with
-      | M_Var var -> translateMemberVar cls var state
-      | M_Constraint con -> translateClassConstraint cls con state in
+      | Var var -> translateMemberVar cls var state
+      | Constraint con -> translateClassConstraint cls con state
+      | Enum _ | Class _ -> raise UnexpectedError in
     (mzn  ^ mzn', state)
   ) (mzn, state) clsSuper.members
 
@@ -642,32 +707,136 @@ and translateClass cls state =
   let (mzn, state) = translateClassBody cls cls mzn state in
   (mzn, popScope state)
 
+let translateEnum enm state =
+  ("", state)
+
 (* translates the entire model *)
 let translateModel state =
-  List.fold_left (fun (mzn, state) d ->
+  List.fold_left (fun (mzn, state) decl ->
     let (mzn', state) =
-      match d with
-      | G_Var var -> translateGlobalVar var state
-      | G_Class cls -> translateClass cls state
-      | G_Constraint con -> translateGlobalConstraint con state in
+      match decl with
+      | Var var -> translateGlobalVar var state
+      | Class cls -> translateClass cls state
+      | Enum enm -> translateEnum enm state
+      | Constraint con -> translateGlobalConstraint con state in
     (mzn  ^ mzn', state)
   ) ("", state) state.model.declarations
 
+(* forward declarations ***********************************************************)
+
+let rec forwardExpr expr state =
+  match expr with
+  | E_Var _ | E_Enum _ -> raise UnexpectedError
+
+  | E_Symbol name ->
+      (match resolveSymbol name state with
+      | Var _ -> E_Var name
+      | Enum _ -> E_Enum name
+      | Class _ | Constraint _ -> raise UnexpectedError)
+      
+  | E_Fold (op, name, collection, where, body) ->
+      let collection = forwardExpr collection state in
+      let bodyState = pushScope (S_Expr (E_Fold (op, name, collection, where, body))) state in
+      let where = forwardExpr where bodyState in
+      let body = forwardExpr body bodyState in
+      E_Fold (op, name, collection, where, body)
+
+  | E_Op (e1, op, e2) -> E_Op ((forwardExpr e1 state), op, (forwardExpr e2 state))
+  | E_Card e -> E_Card (forwardExpr e state)
+  | E_Neg e -> E_Neg (forwardExpr e state)
+  | E_Not e -> E_Not (forwardExpr e state)
+  | E_Paren e -> E_Paren (forwardExpr e state)
+  | E_Access (e, mname) -> E_Access ((forwardExpr e state), mname)
+  | E_Bool _ | E_Int _ -> expr
+      
+let forwardConstraint con state =
+  match con with
+  | C_Where expr -> C_Where (forwardExpr expr state)
+  | C_Maximise expr -> C_Maximise (forwardExpr expr state)
+
+let rec forwardType t state =
+  match t with
+  | T_Symbol name ->
+      (match resolveSymbol name state with
+       | Class cls -> T_Class name
+       | Enum enm -> T_Enum name
+       | Constraint _ | Var _ -> raise (ExpectedClass name))  (* TODO: actually ExpectedType *)
+  | T_Set (t, lb, ub) ->
+      T_Set (forwardType t state, lb, ub)
+  | _ -> t
+
+let forwardVar (vname, t) state =
+  (vname, forwardType t state)
+  
+let forwardEnum enm state =
+  enm
+  
+let forwardClassDecl cls state =
+  let state = pushScope (S_Class cls) state in
+  { cls with members =
+      List.map (fun mbr ->
+        match mbr with
+        | Var var -> Var (forwardVar var state)
+        | Constraint con -> mbr
+        | Enum _ | Class _ -> raise UnexpectedError
+      ) cls.members
+    }
+
+let forwardClassUse cls state =
+  let state = pushScope (S_Class cls) state in
+  { cls with members =
+      List.map (fun mbr ->
+        match mbr with
+        | Constraint con -> Constraint (forwardConstraint con state)
+        | Var var -> mbr
+        | Enum _ | Class _ -> raise UnexpectedError
+      ) cls.members
+    }
+
+(* resolve forward declarations i.e. T_Symbol and E_Symbol *)
+let forwardModel state =
+  let state =
+    (* 1st pass - declarations *)
+    { state with model = { declarations =
+        List.map (fun decl ->
+          match decl with
+          | Var var -> Var (forwardVar var state)
+          | Class cls -> Class (forwardClassDecl cls state)
+          | Enum enm -> Enum (forwardEnum enm state)
+          | Constraint con -> decl
+        ) state.model.declarations
+      }}
+  in
+  (* 2nd pass - constraints *)
+  { state with model = { declarations =
+      List.map (fun decl ->
+        match decl with
+        | Class cls -> Class (forwardClassUse cls state)
+        | Constraint con -> Constraint (forwardConstraint con state)
+        | Var _ | Enum _ -> decl
+      ) state.model.declarations
+    }}
+    
 (* entry point ********************************************************************)
 
 (* translates the model into a string of MiniZinc *)
 let toMiniZinc csModel showCounting hasComments =
-  (* 1st pass: count objects *)
+  (* init *)
   let scope = { parent = None; node = S_Global} in
   let state = { counts = StrMap.empty; indexes = StrMap.empty; model = csModel; 
                 scope = scope; subclasses = StrMap.empty; show_counting = showCounting; 
                 mzn_output = []; comments = hasComments; maximise_count = 0 } in
+                
+  (* 1st pass: resolve forward declarations *)
+  let state = forwardModel state in          
+                
+  (* 2nd pass: count objects *)
   let state = countModel state in
   if showCounting then
     (printCounts state;
     "")
   else
-    (* 2nd pass: translate to MiniZinc *)
+    (* 3rd pass: translate to MiniZinc *)
     let (mzn, state) = translateModel state in
     let state =
       if state.maximise_count > 0 then
