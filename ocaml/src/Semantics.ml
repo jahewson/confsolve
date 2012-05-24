@@ -265,7 +265,7 @@ and resolveFieldAccess expr fname state =
 (* resolve a member variable to a (var, class) *)
 and resolveMemberVar cls name state =
   match resolveMemberSymbol cls name state with
-  | (Var var, Some cls) -> (var, cls)
+  | (Var var, optCls) -> (var, optCls)
   | _ -> raise UnexpectedError
 
 (* resolve a class *)
@@ -522,10 +522,13 @@ let rec translateExpr expr state =
        | S_Global -> vname
        | S_Class cls ->
            let (_, clsDecl) = resolveMemberVar cls vname state in
-           if vname = "this" then
-            "this"
-           else
-             clsDecl.name ^ "_" ^ vname ^ "[this]"
+           (match clsDecl with
+           | None -> vname
+           | Some clsDecl ->
+             if vname = "this" then
+              "this"
+             else
+               clsDecl.name ^ "_" ^ vname ^ "[this]")
        | S_Expr e -> vname)
 
   | E_Access (E_Enum ename, mname) ->
