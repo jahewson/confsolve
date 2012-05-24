@@ -463,11 +463,8 @@ let rec translateType t state =
   | T_Enum ename ->
       "1.." ^ string_of_int (List.length (resolveEnum ename state).elements)
   | T_Ref cname ->
-      let cls = (resolveClass cname state) in
-      if cls.isAbstract then
-        intListToMz (getSubclasses cname state)
-      else
-        "1.." ^ string_of_int (count cname state)
+      ignore (resolveClass cname state);
+      intListToMz (getSubclasses cname state)
   | T_Set (t, lbound, ubound) ->
       "set of " ^ translateType t state
 
