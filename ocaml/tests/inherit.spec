@@ -2,17 +2,23 @@
   test that inheritance of fields and constraints is working
 */
 
+class Foo {
+  var x as int;
+}
+
 abstract class Service {
   var host as ref Machine;
   host.test < 50;
+  var foo as Foo;  // <- test for inherited field counting
 }
 
 class Web_Service extends Service {
   // this is a refinement of the constraint in Service
-  host.test > 20;
+  host.test = 20;  // <- test for inherited constraints
 }
 
 class DHCP_Service extends Service {
+  var bar as 1..5;  // <-- test for subtype fields
 }
 
 class Machine {
@@ -45,3 +51,19 @@ var utilization as int;
 utilization = sum s in services where s.host in enterprise.machines { 
    1;
 };
+
+/////////////////
+
+// test for subtype fields
+var d as ref DHCP_Service;
+d.bar = 4;
+
+// test for inherited constraints
+var ERROR as bool;
+var ws as ref Web_Service;
+ERROR = (ws.host.test != 20);
+
+// test for inherited field counting
+var s as ref Service;
+s.foo.x = 9; // test for counting (Foo_x will be undeclared if count of Foo is zero)
+

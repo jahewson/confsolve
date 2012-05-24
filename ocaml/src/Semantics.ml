@@ -274,6 +274,12 @@ and resolveClass name state =
   | Class c -> c
   | _ -> raise UnexpectedError
 
+(* gets all inherited members of a class *)
+let rec allMembers cls state =
+  match cls.super with
+  | Some cname -> cls.members @ allMembers (resolveClass cname state) state
+  | None -> cls.members
+    
 (* counting ***********************************************************************)
 
 (* generates a list of integers min..max *)
@@ -327,42 +333,56 @@ let rec rootClass cls state =
   
 (* increment object count *)
 let rec countObj cls state =
+  (* increment the root count, and fetch the new id *)
   let state = { state with counts = incr (rootClass cls state).name state.counts } in
-  let id = getCurCount (rootClass cls state).name state in
-  
-  let state = addSubclass cls.name id state in
-  
+  let id = getCurCount (rootClass cls state).name state 
+  in
+  (* always a subclass of itself *)
+  let state = addSubclass cls.name id state
+  in
   match cls.super with
-  | Some sname -> countSuperObj id (resolveClass sname state) state
+  | Some sname ->
+    (* count this subclass, as only the root was counted above *)
+    let state = { state with counts = incr cls.name state.counts }
+    in 
+    (* now count its superclasses *)
+    countSuperObj id (resolveClass sname state) state
   | None -> state
-    
+ 
+(* helper - counts superclasses *)
 and countSuperObj id cls state =
     let root = rootClass cls state in
     if root = cls then
+      (* root already counted by countObj, so we only need to track the subclasss *)
       addSubclass root.name id state
     else
-      let state = { state with counts = incr cls.name state.counts } in
+      (* increment the superclass count *)
+      let state = { state with counts = incr cls.name state.counts } 
+      in
+      (* track the subclasss *)
+      let state = addSubclass cls.name id state
+      in
+      (* next superclass *)
       match cls.super with
-      | Some sname ->
-        let state = addSubclass sname id state in
-        countSuperObj id (resolveClass sname state) state
+      | Some sname -> countSuperObj id (resolveClass sname state) state
       | None -> state
     
 (* count objects for a varDecl *)
-let rec countVarDecl var state =      (* BUG: this seems to not be counting fields from the superclass? *)
-  match snd var with
+let rec countVarDecl (vname, t) state =
+  match t with
   | T_Class cname ->
-      if state.show_counting then print_endline ("\n" ^ fst var ^ ": " ^ cname) else ();
+      if state.show_counting then print_endline ("\n" ^ vname ^ ": " ^ cname) else ();
       let cls = resolveClass cname state in
-      if cls.isAbstract then raise (AbstractInstance ((fst var) ^ ": " ^ cname)) else ();
+      if cls.isAbstract then raise (AbstractInstance (vname ^ ": " ^ cname)) else ();
       let state = countObj cls state in
       List.fold_left (fun state mbr ->
         match mbr with
         | Var v -> countVarDecl v state
         | _ -> state 
-      ) state cls.members (* TODO: does this count inherited fields? *)
+      ) state (allMembers cls state)
+      
   | T_Set (T_Class cname, lbound, ubound) ->
-      if state.show_counting then print_endline ("\n" ^ fst var ^ ": " ^ cname ^ "[" ^ string_of_int ubound ^ "]") else ();
+      if state.show_counting then print_endline ("\n" ^ vname ^ ": " ^ cname ^ "[" ^ string_of_int ubound ^ "]") else ();
       let cls = resolveClass cname state in
       List.fold_left (fun state elem ->
         let state = countObj cls state in
@@ -370,8 +390,9 @@ let rec countVarDecl var state =      (* BUG: this seems to not be counting fiel
           match mbr with
           | Var v -> countVarDecl v state
           | _ -> state
-        ) state cls.members (* TODO: does this count inherited fields? *)
+        ) state (allMembers cls state)
       ) state (seq 1 ubound)
+      
   | _ -> state
 
 (* count all objects in the model *)
@@ -459,6 +480,7 @@ let rec translateType t state =
   | T_Class cname ->
       let cls = (resolveClass cname state) in
       if cls.isAbstract then raise (AbstractInstance (cls.name)) else ();
+      if (count cname state) = 0 then raise (NoInstancesOfClass cname) else ();
       "1.." ^ string_of_int (count cname state)
   | T_Enum ename ->
       "1.." ^ string_of_int (List.length (resolveEnum ename state).elements)
@@ -686,38 +708,37 @@ let translateGlobalConstraint con state =
         "constraint objective_" ^ string_of_int state.maximise_count ^ " = " ^ translateExpr expr state ^ ";\n\n"
       in (mzn, state)
 
-(* translates a class *)
-let rec translateClassBody cls clsSuper mzn state =
-  List.fold_left (fun (mzn, state) mbr ->
-    let (mzn', state) =
-      match mbr with
-      | Var var -> translateMemberVar cls var state
-      | Constraint con -> translateClassConstraint cls con state
-      | Enum _ | Class _ -> raise UnexpectedError in
-    (mzn  ^ mzn', state)
-  ) (mzn, state) clsSuper.members
+(* raise error on non-abstract inheritance *)
+let checkForAbstractInheritance cls state =
+  match cls.super with
+  | Some cname ->
+      let super = (resolveClass cname state) in
+      if not super.isAbstract then
+        raise (NotImplemented ("`" ^ cls.name ^ "` inherits non-abstract class `" ^ cname ^ "`"))
+      else ()
+  | None -> ()
 
 (* translates a class *)
-and translateClass cls state =
+let translateClass cls state =
   if rawCount cls.name state = 0 then
     ("", state)
-  else
+  else (
+    checkForAbstractInheritance cls state;
     let state = pushScope (S_Class cls) state in
-    let mzn = if state.comments then "\n% class " ^ cls.name ^ "\n" else "" in
-    let (mzn, state) =
-      (match cls.super with
-      | Some cname ->
-          let super = (resolveClass cname state) in
-          if not super.isAbstract then
-            raise (NotImplemented ("`" ^ cls.name ^ "` inherits non-abstract class `" ^ cname ^ "`"))
-          else ();
-          (mzn, state)
-      | None -> (mzn, state))
+    let mzn = if state.comments then "\n%\n% class " ^ cls.name ^ "\n%\n" else ""
     in
-    (* current class *)
-    let mzn = mzn ^ if state.comments then "\n% own members\n" else "" in
-    let (mzn, state) = translateClassBody cls cls mzn state in
+    let (mzn, state) = 
+      List.fold_left (fun (mzn, state) mbr ->
+        let (mzn', state) =
+          match mbr with
+          | Var var -> translateMemberVar cls var state
+          | Constraint con -> translateClassConstraint cls con state
+          | Enum _ | Class _ -> raise UnexpectedError in
+        (mzn  ^ mzn', state)
+      ) (mzn, state) (allMembers cls state)
+    in
     (mzn, popScope state)
+  )
 
 let translateEnum enm state =
   ("", state)
