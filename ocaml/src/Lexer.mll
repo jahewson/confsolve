@@ -52,6 +52,8 @@ rule token = parse
  | "in"             { IN }
  | "where"          { WHERE }
  
+ | "bool2int"       { BOOL2INT }
+ 
  | '('              { LPAREN }
  | ')'              { RPAREN }
  | '{'              { LCURLY }

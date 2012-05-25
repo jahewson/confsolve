@@ -38,6 +38,7 @@ type expr =
   | E_Bool of bool
   | E_Int of int
   | E_Paren of expr
+  | E_BoolToInt of expr
 
 type _constraint =
   | C_Where of expr

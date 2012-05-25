@@ -17,6 +17,7 @@ open ConfSolve
 %token WHERE MAXIMIZE MINIMIZE
 %token TRUE FALSE
 %token THIS
+%token BOOL2INT
 %token <Lexing.position * string> ID
 %token <int> INT_LITERAL
 %token EOL
@@ -140,16 +141,17 @@ count: /* NOTE: parens are needed to avoid shift/reduce conflict */
 | COUNT LPAREN id IN expr RPAREN { E_Fold (Sum, $3, $5, E_Bool true, E_Int 1) }
 
 expr:
-| symbol                  { $1 }
-| binaryExpr              { $1 }
-| fold                    { $1 }
-| count                   { $1 }
-| SUB expr %prec UMINUS   { E_Neg $2 }
-| NOT expr                { E_Not $2 }
-| TRUE                    { E_Bool true }
-| FALSE                   { E_Bool false }
-| INT_LITERAL             { E_Int $1 }
-| LPAREN expr RPAREN      { E_Paren $2 }
+| symbol                       { $1 }
+| binaryExpr                   { $1 }
+| fold                         { $1 }
+| count                        { $1 }
+| BOOL2INT LPAREN expr RPAREN  { E_BoolToInt $3 }
+| SUB expr %prec UMINUS        { E_Neg $2 }
+| NOT expr                     { E_Not $2 }
+| TRUE                         { E_Bool true }
+| FALSE                        { E_Bool false }
+| INT_LITERAL                  { E_Int $1 }
+| LPAREN expr RPAREN           { E_Paren $2 }
 ;
 
 symbol:

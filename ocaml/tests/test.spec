@@ -36,3 +36,7 @@ for b in yy.mb {
 exists c in sry {
   c.mv < 9;
 };
+
+var aBool as bool;
+var anInt as int;
+anInt = bool2int(aBool);

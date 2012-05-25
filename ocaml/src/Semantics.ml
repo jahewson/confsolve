@@ -95,6 +95,7 @@ let rec typeof expr state =
   | E_Bool b -> T_Bool
   | E_Int i -> T_Int
   | E_Card e -> T_Int
+  | E_BoolToInt e -> T_Int
   | E_Paren e -> typeof e state
 
 (* return a list of all ancestors of a class, sorted by distance *)
@@ -607,6 +608,7 @@ let rec translateExpr expr state =
   | E_Not e -> "not (" ^ translateExpr e state ^ ")"
   | E_Bool b -> string_of_bool b
   | E_Int i -> string_of_int i
+  | E_BoolToInt e -> "bool2int(" ^ translateExpr e state ^ ")"
   | E_Paren e -> "(" ^ translateExpr e state ^ ")"
   
 (* creates a cardinality constraint for a set *)
@@ -783,6 +785,7 @@ let rec forwardExpr expr state =
   | E_Not e -> E_Not (forwardExpr e state)
   | E_Paren e -> E_Paren (forwardExpr e state)
   | E_Access (e, mname) -> E_Access ((forwardExpr e state), mname)
+  | E_BoolToInt e -> E_BoolToInt (forwardExpr e state)
   | E_Bool _ | E_Int _ -> expr
       
 let forwardConstraint con state =
