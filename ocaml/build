@@ -21,12 +21,27 @@ ocamlc -c Lexer.ml
 ocamlc -c Debug.mli
 ocamlc -c Debug.ml
 
-ocamlc -c Semantics.mli
-ocamlc -c Semantics.ml
+ocamlc -i State.ml > State.mli
+ocamlc -c State.mli
+ocamlc -c State.ml
+
+ocamlc -i Binding.ml > Binding.mli
+ocamlc -c Binding.mli
+ocamlc -c Binding.ml
+
+ocamlc -c Counting.mli
+ocamlc -c Counting.ml
+
+ocamlc -c Forward.mli
+ocamlc -c Forward.ml
+
+ocamlc -c MiniZinc.mli
+ocamlc -c MiniZinc.ml
 
 ocamlc -c Program.ml
 
-ocamlopt -o confsolve-semantics-native Debug.ml ConfSolve.ml Parser.ml Lexer.ml Semantics.ml Program.ml
+ocamlopt -o confsolve-semantics-native ConfSolve.ml Debug.ml Parser.ml Lexer.ml State.ml Binding.ml Counting.ml Forward.ml MiniZinc.ml Program.ml
+
 strip confsolve-semantics-native
 
 rm *.ml*

@@ -2,7 +2,8 @@ open Lexing;;
 open Lexer;;
 open Parser;;
 open ConfSolve;;
-open Semantics;;
+open Forward;;
+open MiniZinc;;
 open Debug;;
 open Printf;;
 
@@ -58,7 +59,8 @@ let main () =
           if !showAst then
             Debug.printAst ast
           else
-            let mz = Semantics.toMiniZinc ast !showCounting !hasComments in
+            let ast = resolveForwardDecls ast in
+            let mz = toMiniZinc ast !showCounting !hasComments in
             print_endline mz
       ;;
       
