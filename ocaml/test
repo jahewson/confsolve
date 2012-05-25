@@ -13,12 +13,7 @@ function run {
     if [ $? -ne 0 ]; then
       result="FAIL--EXIT"
     else
-      # compare output (mzn)
-      if diff ${base%.*}.mzn ../mzn/${base%.*}.mzn &> /dev/null; then
         result="PASS"
-      else
-        result="FAIL--MZN"
-      fi
     fi
 
     if [ $result = "PASS" ]; then
