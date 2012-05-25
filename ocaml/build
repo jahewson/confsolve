@@ -4,8 +4,8 @@ set -e
 mkdir -p bin
 cd bin
 cp ../src/*.ml* ./
-cp ../examples/*.spec* ./
-cp ../tests/*.spec* ./
+cp ../examples/*.csm* ./
+cp ../tests/*.csm* ./
 
 ocamlc -i ConfSolve.ml > ConfSolve.mli
 ocamlc -c ConfSolve.mli
@@ -38,9 +38,9 @@ ocamlc -c Forward.ml
 ocamlc -c MiniZinc.mli
 ocamlc -c MiniZinc.ml
 
-ocamlc -c Program.ml
+ocamlc -c Csm2Mzn.ml
 
-ocamlopt -o confsolve-semantics-native ConfSolve.ml Debug.ml Parser.ml Lexer.ml State.ml Binding.ml Counting.ml Forward.ml MiniZinc.ml Program.ml
+ocamlopt -o confsolve-semantics-native ConfSolve.ml Debug.ml Parser.ml Lexer.ml State.ml Binding.ml Counting.ml Forward.ml MiniZinc.ml Csm2Mzn.ml
 
 strip confsolve-semantics-native
 

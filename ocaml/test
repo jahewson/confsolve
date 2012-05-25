@@ -25,5 +25,5 @@ function run {
   done
 }
 
-run "../*.spec"
-run "../../examples/*.spec"
+run "../*.csm"
+run "../../examples/*.csm"
