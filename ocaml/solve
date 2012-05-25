@@ -6,4 +6,4 @@ cd bin
 echo "mzn2fzn..."
 time mzn2fzn --no-optimize --no-output-ozn test.mzn
 echo "solving..."
-fz -s test.fzn
+fz -time 60000 -s test.fzn
