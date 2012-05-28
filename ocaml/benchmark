@@ -9,13 +9,13 @@ function run {
   do
     base=`basename $f`
 
-    ../../bin/confsolve-semantics-bytecode $f &> /dev/null;
+    ../../bin/csm2mzn $f &> /dev/null;
 
     if [ $? -ne 0 ]; then
       echo ""
       echo "FAILED"
     else
-      time `../../bin/confsolve-semantics-bytecode $f &> ${base%.*}.mzn
+      time `../../bin/csm2mzn $f &> ${base%.*}.mzn
       mzn2fzn --no-optimize --no-output-ozn ${base%.*}.mzn &> /dev/null; 
       fz -time 3000 ${base%.*}.fzn &> /dev/null;`
     fi

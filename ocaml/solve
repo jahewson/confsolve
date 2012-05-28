@@ -2,8 +2,8 @@
 set -e
 
 cd bin
-./confsolve-semantics-bytecode $* > test.mzn
+./csm2mzn $* > temp.mzn
 echo "mzn2fzn..."
-time mzn2fzn --no-optimize --no-output-ozn test.mzn
+time mzn2fzn --no-optimize --no-output-ozn temp.mzn
 echo "solving..."
-fz -time 60000 -s test.fzn
+fz -time 60000 -s temp.fzn

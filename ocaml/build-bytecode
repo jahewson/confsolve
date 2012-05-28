@@ -40,8 +40,28 @@ ocamlc -c MiniZinc.ml
 
 ocamlc -c Csm2Mzn.ml
 
-ocamlopt -o confsolve-semantics-native ConfSolve.ml Debug.ml Parser.ml Lexer.ml State.ml Binding.ml Counting.ml Forward.ml MiniZinc.ml Csm2Mzn.ml
+ocamlc -o csm2mzn ConfSolve.cmo Debug.cmo Parser.cmo Lexer.cmo State.cmo Binding.cmo Counting.cmo Forward.cmo MiniZinc.cmo Csm2Mzn.cmo
 
-strip confsolve-semantics-native
+#############
+
+ocamlc -i SznSolution.ml > SznSolution.mli
+ocamlc -c SznSolution.mli
+ocamlc -c SznSolution.ml
+
+ocamlc -c CSON.mli
+ocamlc -c CSON.ml
+
+ocamlyacc -v SznParser.mly
+ocamlc -c SznParser.mli
+ocamlc -c SznParser.ml
+
+ocamllex -q SznLexer.mll
+ocamlc -c SznLexer.ml
+
+ocamlc -c Szn2Cson.ml
+
+ocamlc -o szn2cson ConfSolve.cmo Debug.cmo Parser.cmo Lexer.cmo State.cmo Binding.cmo Counting.cmo Forward.cmo CSON.cmo SznSolution.cmo SznParser.cmo SznLexer.cmo Szn2Cson.cmo
+
+#############
 
 rm *.ml*

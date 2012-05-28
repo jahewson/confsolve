@@ -8,7 +8,7 @@ function run {
   for f in $1
   do
     base=`basename $f`
-    ../../bin/confsolve-semantics-bytecode $f &> ${base%.*}.mzn
+    ../../bin/csm2mzn $f &> ${base%.*}.mzn
 
     if [ $? -ne 0 ]; then
       result="FAIL--EXIT"
