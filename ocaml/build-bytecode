@@ -7,70 +7,75 @@ cp ../src/*.ml* ./
 cp ../examples/*.csm* ./
 cp ../tests/*.csm* ./
 
-ocamlc -i Util.ml > Util.mli
-ocamlc -c Util.mli
-ocamlc -c Util.ml
+echo "let sha =\n  \"`git rev-parse --short=10 HEAD`\"" > Version.ml
+ocamlc -g -i Version.ml > Version.mli
+ocamlc -g -c Version.mli
+ocamlc -g -c Version.ml
 
-ocamlc -i ConfSolve.ml > ConfSolve.mli
-ocamlc -c ConfSolve.mli
-ocamlc -c ConfSolve.ml
+ocamlc -g -i Util.ml > Util.mli
+ocamlc -g -c Util.mli
+ocamlc -g -c Util.ml
+
+ocamlc -g -i ConfSolve.ml > ConfSolve.mli
+ocamlc -g -c ConfSolve.mli
+ocamlc -g -c ConfSolve.ml
 
 ocamlyacc -v Parser.mly
-ocamlc -c Parser.mli
-ocamlc -c Parser.ml
+ocamlc -g -c Parser.mli
+ocamlc -g -c Parser.ml
 
 ocamllex -q Lexer.mll
-ocamlc -c Lexer.ml
+ocamlc -g -c Lexer.ml
 
-ocamlc -c Debug.mli
-ocamlc -c Debug.ml
+ocamlc -g -c Debug.mli
+ocamlc -g -c Debug.ml
 
-ocamlc -i State.ml > State.mli
-ocamlc -c State.mli
-ocamlc -c State.ml
+ocamlc -g -i State.ml > State.mli
+ocamlc -g -c State.mli
+ocamlc -g -c State.ml
 
-ocamlc -i Binding.ml > Binding.mli
-ocamlc -c Binding.mli
-ocamlc -c Binding.ml
+ocamlc -g -i Binding.ml > Binding.mli
+ocamlc -g -c Binding.mli
+ocamlc -g -c Binding.ml
 
-ocamlc -c Counting.mli
-ocamlc -c Counting.ml
+ocamlc -g -c Counting.mli
+ocamlc -g -c Counting.ml
 
-ocamlc -c Forward.mli
-ocamlc -c Forward.ml
+ocamlc -g -c Forward.mli
+ocamlc -g -c Forward.ml
 
-ocamlc -c TypeCheck.mli
-ocamlc -c TypeCheck.ml
+ocamlc -g -c TypeCheck.mli
+ocamlc -g -c TypeCheck.ml
 
-ocamlc -c Literals.mli
-ocamlc -c Literals.ml
+ocamlc -g -c Literals.mli
+ocamlc -g -c Literals.ml
 
-ocamlc -c MiniZinc.mli
-ocamlc -c MiniZinc.ml
+ocamlc -g -c MiniZinc.mli
+ocamlc -g -c MiniZinc.ml
 
-ocamlc -c Csm2Mzn.ml
+ocamlc -g -c Csm2Mzn.ml
 
-ocamlc -o csm2mzn Util.cmo ConfSolve.cmo Debug.cmo Parser.cmo Lexer.cmo State.cmo Binding.cmo Counting.cmo Forward.cmo TypeCheck.cmo Literals.cmo MiniZinc.cmo Csm2Mzn.cmo
+ocamlc -g -o csm2mzn Version.cmo Util.cmo ConfSolve.cmo Debug.cmo Parser.cmo Lexer.cmo State.cmo Binding.cmo Counting.cmo Forward.cmo TypeCheck.cmo Literals.cmo MiniZinc.cmo Csm2Mzn.cmo
 
 #############
 
-ocamlc -i SznSolution.ml > SznSolution.mli
-ocamlc -c SznSolution.mli
-ocamlc -c SznSolution.ml
+ocamlc -g -i SznSolution.ml > SznSolution.mli
+ocamlc -g -c SznSolution.mli
+ocamlc -g -c SznSolution.ml
 
-ocamlc -c CSON.mli
-ocamlc -c CSON.ml
+ocamlc -g -c CSON.mli
+ocamlc -g -c CSON.ml
 
 ocamlyacc -v SznParser.mly
-ocamlc -c SznParser.mli
-ocamlc -c SznParser.ml
+ocamlc -g -c SznParser.mli
+ocamlc -g -c SznParser.ml
 
 ocamllex -q SznLexer.mll
-ocamlc -c SznLexer.ml
+ocamlc -g -c SznLexer.ml
 
-ocamlc -c Szn2Cson.ml
+ocamlc -g -c Szn2Cson.ml
 
-ocamlc -o szn2cson Util.cmo ConfSolve.cmo Debug.cmo Parser.cmo Lexer.cmo State.cmo Binding.cmo Counting.cmo Forward.cmo TypeCheck.cmo Literals.cmo CSON.cmo SznSolution.cmo SznParser.cmo SznLexer.cmo Szn2Cson.cmo
+ocamlc -g -o szn2cson Version.cmo Util.cmo ConfSolve.cmo Debug.cmo Parser.cmo Lexer.cmo State.cmo Binding.cmo Counting.cmo Forward.cmo TypeCheck.cmo Literals.cmo CSON.cmo SznSolution.cmo SznParser.cmo SznLexer.cmo Szn2Cson.cmo
 
 #############
 
