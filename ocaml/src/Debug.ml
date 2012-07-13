@@ -1,12 +1,19 @@
 open ConfSolve
 open Parser
+open Util
 
 let rec typeToString (t: _type) =
   match t with
   | T_Symbol s -> "T_Symbol"
   | T_Int -> "T_Int"
   | T_Bool -> "T_Bool"
-  | T_Range(m,n) -> "T_Range " ^ string_of_int m ^ ".." ^ string_of_int n
+  | T_BInt set ->
+      "{" ^ (IntSet.fold (fun elem acc  ->
+          if String.length acc = 0 then 
+            string_of_int elem
+          else
+            acc ^ "," ^ string_of_int elem
+        ) set "") ^ "}"
   | T_Class(c) -> "T_Class " ^ c
   | T_Ref(r) -> "T_Ref " ^ r
   | T_Set(t,lbound,ubound) -> "T_Set " ^ typeToString t ^ "[" ^ string_of_int lbound ^ "," ^ string_of_int ubound ^ "]"

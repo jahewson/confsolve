@@ -1,5 +1,6 @@
 %{
 open ConfSolve
+open Util
 %}
 
 %token LCURLY RCURLY
@@ -71,14 +72,28 @@ type:
 
 finiteType:
 | BOOL                          { T_Bool }
-| INT_LITERAL DOTS INT_LITERAL  { T_Range ($1, $3) }
+| range                         { $1 }
+| finiteInt                     { $1 }
 | REF id                        { T_Ref $2 }
 | id                            { T_Symbol $1 } /* may or may not actually be finite */
 ;
 
-setType:
+range:
+  INT_LITERAL DOTS INT_LITERAL  { T_BInt (makeSet $1 $3) } /* Q: allow nesting of any (constant) expression? */
+;
+
+finiteInt:
+  LCURLY fiElementList RCURLY  { T_BInt $2 } /* Q: allow nesting of any (constant) expression? */
+  
+fiElementList: /* Q: allow nesting of any (constant) expression? */
+| INT_LITERAL                      { IntSet.singleton $1 }
+| fiElementList COMMA INT_LITERAL  { IntSet.add $3 $1 }
+;
+
+setType: /* Q: allow nesting of any (constant) expression, instead of INT_LITERAL? */
   finiteType LSQUARE INT_LITERAL DOTS INT_LITERAL RSQUARE   { T_Set ($1, $3, $5) }
 | finiteType LSQUARE INT_LITERAL RSQUARE                    { T_Set ($1, $3, $3) }
+| finiteType LSQUARE RSQUARE                                { T_Set ($1, -1, -1) }
 
 enumDecl:
   ENUM id LCURLY enumElementList RCURLY  { Enum { enumName=$2; elements=$4 } }
@@ -145,6 +160,7 @@ expr:
 | binaryExpr                   { $1 }
 | fold                         { $1 }
 | count                        { $1 }
+| setLiteral                   { $1 }
 | BOOL2INT LPAREN expr RPAREN  { E_BoolToInt $3 }
 | SUB expr %prec UMINUS        { E_Neg $2 }
 | NOT expr                     { E_Not $2 }
@@ -152,6 +168,15 @@ expr:
 | FALSE                        { E_Bool false }
 | INT_LITERAL                  { E_Int $1 }
 | LPAREN expr RPAREN           { E_Paren $2 }
+;
+
+setLiteral:
+  LCURLY setElementList RCURLY  { E_Set $2 }
+;
+
+setElementList:
+| expr                       { $1 :: [] }
+| setElementList COMMA expr  { $1 @ [$3] }
 ;
 
 symbol:

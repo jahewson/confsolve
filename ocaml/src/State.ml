@@ -1,6 +1,4 @@
-module StrMap = Map.Make(String)
-
-exception UnexpectedError
+open Util
 
 (* state ************************************************************************)
 
@@ -23,6 +21,7 @@ type state = {
   subclasses: int list StrMap.t;  (* map of superclass names to subclass indices *)
   indexes: int StrMap.t;          (* current index per-class *)
   maximise_count: int;            (* count of maximise terms *)
+  set_count: int;                 (* count of set literal variables *)
   scope: scope;                   (* scope tree *)
   mzn_output: string list;        (* MiniZinc `output` variables *)
   show_counting: bool;            (* debugging - print the object counts *)

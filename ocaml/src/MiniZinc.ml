@@ -3,24 +3,9 @@ open State
 open Binding
 open Counting
 open Forward
-
-module StrMap = Map.Make(String)
-
-exception UnexpectedError
-exception NotImplemented of string
+open Util
 
 (* translation ********************************************************************)
-
-(* check if a range is contiguous *)
-let isContiguous list =
-  let (_,_,is) =
-    List.fold_left (fun (prev, idx, is) elem ->
-      if idx = 0 then
-        (elem, 1, true)
-      else
-        (elem, idx + 1, is && elem = prev + 1)
-    ) (0, 0, true) list
-  in is
 
 (* integer list to MiniZinc array literal,
    with collapsing to a range if contiguous *)
@@ -43,7 +28,16 @@ let rec translateType t state =
   | T_Symbol sym -> raise UnexpectedError
   | T_Int -> "int"
   | T_Bool -> "bool"
-  | T_Range (m, n) -> string_of_int m ^ ".." ^ string_of_int n
+  | T_BInt set ->
+      if isSetContiguous set then
+        string_of_int (IntSet.min_elt set) ^ ".." ^ string_of_int (IntSet.max_elt set)
+      else
+        "{" ^ (IntSet.fold (fun elem acc  ->
+            if String.length acc = 0 then 
+              string_of_int elem
+            else
+              acc ^ "," ^ string_of_int elem
+          ) set "") ^ "}"
   | T_Class cname ->
       let cls = (resolveClass cname state) in
       if cls.isAbstract then raise (AbstractInstance (cls.name)) else ();
@@ -159,13 +153,31 @@ let rec translateExpr expr state =
               else
                 "1.." ^ string_of_int (count cname state)
             | T_Ref cname -> "1.." ^ string_of_int (count cname state)
-            | _ -> string_of_int lbound ^ ".." ^ string_of_int ubound
+            | T_Bool -> "{true,false}"
+            | T_BInt _ 
+            | T_Enum _ ->
+                translateType t state
+            | T_Symbol _
+            | T_Set _
+            | T_Int -> 
+                raise UnexpectedError
           in
           (match op with | ForAll -> "forall" | Exists -> "exists" | Sum -> "sum")
           ^ " (" ^ name ^ " in " ^ mznRange ^ ") (\n"
           ^ "    " ^ mzBody ^ "\n"
           ^ "  )"
       | _ -> raise (ExpectedSet1 name)) 
+
+  | E_Set elist ->
+      raise (NotImplemented "set literals")
+      (* requires constants *)
+      (*let mzn =
+        List.fold_left (fun mzn e ->
+          let mzn = mzn ^ if String.length mzn = 0 then "" else "," in
+          mzn ^ (translateExpr e state)
+        ) "" elist
+      in
+      "{" ^ mzn ^ "}"*)
 
   | E_Op (e1, Pow, e2) -> "pow (" ^ translateExpr e1 state ^ "," ^ translateExpr e2 state ^ ")"
   | E_Op (e1, op, e2) -> translateExpr e1 state ^ " " ^ translateOp op ^ " " ^ translateExpr e2 state
@@ -214,7 +226,11 @@ let translateMemberVar cls var state =
   | T_Set (_, lbound, ubound) ->
       let mzn = mzn ^ "var " ^ translateType t state ^ ": " ^ cls.name ^ "_" ^ vname ^ ";\n" in
       let expr = cardConstraint vname lbound ubound state in
-      let mzn = mzn ^ "constraint forall (this in 1.." ^ string_of_int ccount ^ ") (" ^ translateExpr expr state ^ ");\n" in
+      let mzn = 
+        if lbound != -1 then
+          mzn ^ "constraint forall (this in 1.." ^ string_of_int ccount ^ ") (" ^ translateExpr expr state ^ ");\n"
+        else mzn
+      in
       (mzn, state)
   | _ ->
       let mzn = mzn ^ "var " ^ translateType t state ^ ": " ^ cls.name ^ "_" ^ vname ^ ";\n" in
@@ -241,11 +257,23 @@ let rec translateGlobalVar var state =
   | T_Set (_, lbound, ubound) ->
       let mzn = mzn ^ "var " ^ translateType t state ^ ": " ^ vname ^ ";\n" in
       let expr = cardConstraint vname lbound ubound state in
-      let mzn = mzn ^  "constraint " ^ translateExpr expr state ^ ";\n" in
+      let mzn = 
+        if lbound != -1 then
+          mzn ^ "constraint " ^ translateExpr expr state ^ ";\n"
+        else mzn
+      in
       (mzn, state)
   | _ ->
       let mzn = mzn ^ "var " ^ translateType t state ^ ": " ^ vname ^ ";\n" in
       (mzn, state)
+      (* constants *)
+      (*let expr = getVarConstantExpr (Var var) state in
+      let mzn = mzn ^ (if isVarConstant (Var var) state then "" else "var ") ^ translateType t state ^ ": " ^ vname ^ 
+        (match expr with
+        | Some expr -> " = " ^ translateExpr expr state ^ ";\n"
+        | None -> ";\n")
+      in
+      (mzn, state)*)
     
 (* translates a class-level constraint *)    
 let translateClassConstraint cls con state =
@@ -334,7 +362,7 @@ let toMiniZinc csModel showCounting hasComments =
   let scope = { parent = None; node = S_Global} in
   let state = { counts = StrMap.empty; indexes = StrMap.empty; model = csModel; 
                 scope = scope; subclasses = StrMap.empty; show_counting = showCounting; 
-                mzn_output = []; comments = hasComments; maximise_count = 0 } in
+                mzn_output = []; comments = hasComments; maximise_count = 0; set_count = 0 } in
                 
   (* 1st pass: count objects *)
   let state = countModel state in

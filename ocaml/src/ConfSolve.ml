@@ -1,3 +1,5 @@
+open Util
+  
 type className = string
 type fieldName = string
 type varName = string
@@ -8,9 +10,9 @@ type _type =
   | T_Symbol of string   (* untyped *)
   | T_Class of className (* typed *)
   | T_Enum of enumName   (* typed *)
-  | T_Int
   | T_Bool
-  | T_Range of int * int
+  | T_Int                (* unbounded int *)
+  | T_BInt of IntSet.t   (* bounded int *)
   | T_Ref of className
   | T_Set of _type * int * int (* lbound, ubound *)
 
@@ -37,6 +39,7 @@ type expr =
   | E_Not of expr
   | E_Bool of bool
   | E_Int of int
+  | E_Set of expr list
   | E_Paren of expr
   | E_BoolToInt of expr
 

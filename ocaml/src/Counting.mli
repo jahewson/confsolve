@@ -1,6 +1,4 @@
-module StrMap : Map.S with type key = string
-
-val seq : int -> int -> int list
+open Util
 
 val getSubclassIds : StrMap.key -> State.state -> int list
 val countModel : State.state -> State.state

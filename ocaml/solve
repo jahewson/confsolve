@@ -1,7 +1,6 @@
 #!/bin/sh
-set -e
-
 cd bin
+rm temp.mzn
 ./csm2mzn $* > temp.mzn
 echo "mzn2fzn..."
 time mzn2fzn --no-optimize --no-output-ozn temp.mzn

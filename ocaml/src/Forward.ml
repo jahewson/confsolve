@@ -1,6 +1,7 @@
 open ConfSolve
 open State
 open Binding
+open Util
 
 (* forward declarations ***********************************************************)
 
@@ -29,6 +30,7 @@ let rec forwardExpr expr state =
   | E_Access (e, mname) -> E_Access ((forwardExpr e state), mname)
   | E_BoolToInt e -> E_BoolToInt (forwardExpr e state)
   | E_Bool _ | E_Int _ -> expr
+  | E_Set elist -> E_Set (List.map (fun e -> forwardExpr e state) elist)
       
 let forwardConstraint con state =
   match con with
@@ -79,7 +81,7 @@ let resolveForwardDecls csModel =
   let scope = { parent = None; node = S_Global} in
   let state = { counts = StrMap.empty; indexes = StrMap.empty; model = csModel; 
                 scope = scope; subclasses = StrMap.empty; show_counting = false; 
-                mzn_output = []; comments = false; maximise_count = 0 } in
+                mzn_output = []; comments = false; maximise_count = 0; set_count = 0 } in
   let state =
     (* 1st pass - declarations *)
     { state with model = { declarations =

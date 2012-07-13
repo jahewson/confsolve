@@ -3,7 +3,9 @@ open Lexer;;
 open Parser;;
 open ConfSolve;;
 open Forward;;
+open Literals;;
 open MiniZinc;;
+open TypeCheck;;
 open Debug;;
 open Printf;;
 
@@ -60,8 +62,11 @@ let main () =
             Debug.printAst ast
           else
             let ast = resolveForwardDecls ast in
+            typeCheck ast;
+            let ast = decomposeLiterals ast in
             let mz = toMiniZinc ast !showCounting !hasComments in
             print_endline mz
       ;;
       
+Printexc.record_backtrace true;;
 main();;

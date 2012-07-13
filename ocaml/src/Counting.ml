@@ -1,20 +1,9 @@
 open ConfSolve
 open State
 open Binding
-
-module StrMap = Map.Make(String)
+open Util
 
 (* counting ***********************************************************************)
-
-(* generates a list of integers min..max *)
-let seq min max =
-  let rec next cur range =
-    if cur = max then
-      range @ [cur]
-    else
-      next (cur + 1) (range @ [cur])
-  in
-  next min []
 
 (* increment count of key in lst *)
 let incr key lst =
@@ -121,12 +110,13 @@ let rec countVarDecl (vname, t) state =
 
 (* count all objects in the model *)
 let countModel state =
+  let state = { state with counts = StrMap.add "!hasCounts" 1 state.counts } in
   List.fold_left (fun state d ->
     match d with
     | Var v -> countVarDecl v state
     | _ -> state
   ) state state.model.declarations
-    
+
 (* for debugging *)
 let printCounts state =
   print_endline "\n------------\n";
