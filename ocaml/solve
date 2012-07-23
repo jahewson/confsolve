@@ -1,8 +1,10 @@
 #!/bin/sh
 cd bin
 rm temp.mzn
-./csm2mzn $* > temp.mzn
+./csm2mzn $1 $2 > temp.mzn
 echo "mzn2fzn..."
-time mzn2fzn --no-optimize --no-output-ozn temp.mzn
-echo "solving..."
-fz -time 60000 -s temp.fzn
+mzn2fzn --no-optimize --no-output-ozn temp.mzn
+echo "fz..."
+fz -time 60000 -s temp.fzn > temp.szn
+echo "szn2cson..."
+./szn2cson $2 temp.szn

@@ -13,11 +13,14 @@ let incr_lineno lexbuf =
 rule token = parse
    [' ' '\t' '\r']  { token lexbuf }                         (* skip whitespace *)
  | "\n"             { incr_lineno lexbuf; token lexbuf }     (* skip whitespace *)
- | ['0'-'9']+       { INT_LITERAL( int_of_string(lexeme lexbuf)) }
+ | "%"              { line_comment lexbuf }
+ | "----------"     { SOL_END }
+ | ['0'-'9' '-']+   { INT_LITERAL(int_of_string (lexeme lexbuf)) }
  | "true"           { TRUE }
  | "false"          { FALSE }
  
- | '-'              { SUB }
+ | "array1d"        { ARRAY1D }
+ 
  | '='              { EQ }
  
  | '('              { LPAREN }
@@ -27,10 +30,15 @@ rule token = parse
  | '['              { LSQUARE }
  | ']'              { RSQUARE }
  
- | '.'              { DOT }
+ | ".."             { DOTS }
  | ','              { COMMA }
 
- 
- | ['a'-'z' 'A'-'Z' '0'-'9']['a'-'z' 'A'-'Z' '0'-'9' '_']* { ID(Lexing.lexeme_start_p lexbuf, lexeme lexbuf) }
+ | ['a'-'z' 'A'-'Z']['a'-'z' 'A'-'Z' '0'-'9' '_']* { ID (lexeme lexbuf) }
  | ';'              { SEMICOLON }
  | eof              { EOF }
+ 
+and line_comment = parse
+ | '\n'
+     { incr_lineno lexbuf; token lexbuf }
+ | _
+     { line_comment lexbuf }

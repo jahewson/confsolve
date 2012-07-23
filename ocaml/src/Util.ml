@@ -9,11 +9,7 @@ exception NotImplemented of string
 module StrMap = Map.Make(String)
 
 (* set of int *)
-module IntSet = Set.Make( 
-  struct
-    let compare = Pervasives.compare
-    type t = int
-  end)
+module IntSet = Set.Make(struct type t = int let compare = compare end)
 
 (* functions *********************************************************************)
 
