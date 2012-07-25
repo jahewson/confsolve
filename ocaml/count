@@ -1,0 +1,2 @@
+#!/bin/sh
+cloc src --force-lang=ocaml,mli  --force-lang=ocaml,mly --force-lang=ocaml,mll
