@@ -20,17 +20,18 @@ let rec printTokens (lexbuf) =
   
 (* parses command-line args imperatively *)
 let main () =
-  let (filename, showTokens, showAst, showCounting, hasComments, showVersion) = 
-      ((ref ""), (ref false), (ref false), (ref false), (ref false), (ref false)) 
+  let (filename, csonFilename, showTokens, showAst, showCounting, hasComments, showVersion) = 
+      ((ref ""), (ref ""), (ref false), (ref false), (ref false), (ref false), (ref false)) 
   in
   let arglist = [
-    ("-c", Arg.Set hasComments, "comment the MiniZinc");
-    ("-v", Arg.Set showVersion, "print version");
-    ("--debug-tokens", Arg.Set showTokens, "print lexer tokens (debug)");
-    ("--debug-ast", Arg.Set showAst, "print AST (debug)");
-    ("--debug-counting", Arg.Set showCounting, "print object count (debug)")] 
+    ("-c", Arg.Set hasComments, " Comment the MiniZinc");
+    ("-s", Arg.Set_string csonFilename, "filename.cson  Set previous solution");
+    ("-v", Arg.Set showVersion, " Print version");
+    ("--debug-tokens", Arg.Set showTokens, " Print lexer tokens (debug)");
+    ("--debug-ast", Arg.Set showAst, " Print AST (debug)");
+    ("--debug-counting", Arg.Set showCounting, " Print object count (debug)")] 
   in
-    let msg = "usage: filename [options]" in
+    let msg = "usage: filename.csm [options]" in
   let _ = (Arg.parse arglist (fun s ->
       if String.length !filename = 0 then
         filename := s
@@ -51,6 +52,7 @@ let main () =
       if !showTokens then
         printTokens lexbuf
       else
+        (* parse model *)
         let ast =
           try
             Parser.model Lexer.token lexbuf
@@ -64,6 +66,27 @@ let main () =
                            ":\nError: Syntax error at `" ^ tok ^ "`");
             exit 1
           in
+            (* parse cson *)
+            let cson =
+              if String.length !csonFilename = 0 then
+                None
+              else
+                let lexbuf = Lexing.from_channel (open_in !csonFilename) in
+                try
+                  let rv = Some (CsonParser.solution CsonLexer.token lexbuf) in
+                  print_endline "* parsed CSON ok :)";  (* TODO *)
+                  rv
+                with
+                | Parsing.Parse_error ->
+                  let tok = Lexing.lexeme lexbuf in
+                  let curr = lexbuf.lex_curr_p in
+                  let cnum = curr.pos_cnum - curr.pos_bol in
+                  let line = curr.pos_lnum in
+                  print_endline ("File \"" ^ !csonFilename ^ "\", line " ^ string_of_int line ^ " character " ^ string_of_int cnum ^
+                                 ":\nError: Syntax error at `" ^ tok ^ "`");
+                  exit 1
+            in
+            (* process *)
             if !showAst then
               Debug.printAst ast
             else

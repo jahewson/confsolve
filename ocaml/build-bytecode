@@ -20,12 +20,23 @@ ocamlc -g -i ConfSolve.ml > ConfSolve.mli
 ocamlc -g -c ConfSolve.mli
 ocamlc -g -c ConfSolve.ml
 
+ocamlc -g -i CsonSolution.ml > CsonSolution.mli
+ocamlc -g -c CsonSolution.mli
+ocamlc -g -c CsonSolution.ml
+
 ocamlyacc -v Parser.mly
 ocamlc -g -c Parser.mli
 ocamlc -g -c Parser.ml
 
 ocamllex -q Lexer.mll
 ocamlc -g -c Lexer.ml
+
+ocamlyacc -v CsonParser.mly
+ocamlc -g -c CsonParser.mli
+ocamlc -g -c CsonParser.ml
+
+ocamllex -q CsonLexer.mll
+ocamlc -g -c CsonLexer.ml
 
 ocamlc -g -c Debug.mli
 ocamlc -g -c Debug.ml
@@ -55,7 +66,7 @@ ocamlc -g -c MiniZinc.ml
 
 ocamlc -g -c Csm2Mzn.ml
 
-ocamlc -g -o csm2mzn Version.cmo Util.cmo ConfSolve.cmo Debug.cmo Parser.cmo Lexer.cmo State.cmo Binding.cmo Counting.cmo Forward.cmo TypeCheck.cmo Literals.cmo MiniZinc.cmo Csm2Mzn.cmo
+ocamlc -g -o csm2mzn Version.cmo Util.cmo ConfSolve.cmo CsonSolution.cmo Debug.cmo Parser.cmo Lexer.cmo CsonParser.cmo CsonLexer.cmo State.cmo Binding.cmo Counting.cmo Forward.cmo TypeCheck.cmo Literals.cmo MiniZinc.cmo Csm2Mzn.cmo
 
 #############
 
