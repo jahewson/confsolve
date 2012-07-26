@@ -19,7 +19,7 @@ let convertModel state solution map =
         ename ^ "." ^ List.nth enm.elements (i - 1)
   
     | (V_Int i, T_Ref cname) ->
-        PathMap.find (cname, i) map
+        "ref " ^ PathMap.find (cname, i) map
       
     | (V_Bool true, _) -> "true"
     | (V_Bool false, _) -> "false"
@@ -56,7 +56,7 @@ let convertModel state solution map =
       ) ("", state) (allMembers cls state)
     in
     let pad = String.make ((indent - 1) * 2) ' ' in
-    let cson = cls.name ^ " {\n" ^ cson ^ pad ^ "}\n" in
+    let cson = cls.name ^ " {\n" ^ cson ^ pad ^ "}" in
     (cson, state)
 
   and getValueHelper id_cls vname =
@@ -84,7 +84,7 @@ let convertModel state solution map =
           let id = int_of_string id in
           let cls = (resolveClass cname state) in
           let (cson, state) = convertObject id cls state indent in
-          let cson = vname ^ ": " ^ cson in
+          let cson = vname ^ ": " ^ cson ^ ",\n" in
           (cson, state)
   
       | T_Set(T_Class cname, _, ubound) ->
