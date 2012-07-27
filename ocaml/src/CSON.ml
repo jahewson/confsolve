@@ -142,7 +142,7 @@ and mapVar id_cls (vname, t) state map path =
       let (map, state, _) = List.fold_left (fun (map, state, i) id ->
         let id = int_of_string id in
         let map = PathMap.add (cname, id) path map in
-        let (map, state) = mapObject id (resolveClass cname state) state map ("[" ^ string_of_int i ^ "]") in
+        let (map, state) = mapObject id (resolveClass cname state) state map (vname ^ "[" ^ string_of_int i ^ "]") in
         (map, state, i + 1)
       ) (map, state, 0) indices
       in
