@@ -92,7 +92,8 @@ let convertModel state solution map =
           let (cson, state, _) = List.fold_left (fun (cson, state, i) id ->
             let id = int_of_string id in
             let cls = (resolveClass cname state) in
-            let (cson, state) = convertObject id cls state (indent + 1) in
+            let (cson', state) = convertObject id cls state (indent + 1) in
+            let cson = (if String.length cson = 0 then "" else cson ^ ",\n" ^ pad ^ "  ") ^ cson' in
             (cson, state, i + 1)
           ) ("", state, 0) indices
           in
@@ -141,8 +142,9 @@ and mapVar id_cls (vname, t) state map path =
       let (indices, state) = newIndices cname ubound state in
       let (map, state, _) = List.fold_left (fun (map, state, i) id ->
         let id = int_of_string id in
+        let path = vname ^ "[" ^ string_of_int i ^ "]" in
         let map = PathMap.add (cname, id) path map in
-        let (map, state) = mapObject id (resolveClass cname state) state map (vname ^ "[" ^ string_of_int i ^ "]") in
+        let (map, state) = mapObject id (resolveClass cname state) state map path in
         (map, state, i + 1)
       ) (map, state, 0) indices
       in
