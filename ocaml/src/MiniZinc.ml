@@ -7,6 +7,44 @@ open Util
 
 (* translation ********************************************************************)
 
+(* CSON value to MiniZinc, almost but not quite a ConfSolve expression *)
+let rec csonToMz value paths globals state =
+  match value with
+  | CsonSolution.V_Bool true -> "true"
+  | CsonSolution.V_Bool false -> "false"
+  | CsonSolution.V_Int i -> string_of_int i
+  | CsonSolution.V_Set lst ->
+      "{" ^
+      List.fold_left (fun acc elem ->
+        let acc = acc ^ if String.length acc = 0 then "" else ", " in
+        acc ^ csonToMz elem paths globals state
+      ) "" lst
+      ^ "}"
+  | CsonSolution.V_Object obj ->
+      (* constant, so we never need to write its old value *)
+      raise UnexpectedError
+  | CsonSolution.V_Ref reference ->
+      let id = CsonSolution.csonRefId reference globals paths in
+      string_of_int id
+  | CsonSolution.V_Enum (ename, mname) -> 
+      translateEnumExpr ename mname state
+
+(* translates an enum *)
+and translateEnumExpr ename mname state =
+  let enm = resolveEnum ename state in
+  let (_, idx) = 
+    List.fold_left (fun (i, found) elem ->
+      if elem = mname then
+        (i + 1, i)
+      else
+        (i + 1, found)
+    ) (1, -1) enm.elements
+  in
+  if idx = -1 then
+    raise (EnumMemberNotDefined (ename, mname))
+  else
+    string_of_int idx
+          
 (* integer list to MiniZinc array literal,
    with collapsing to a range if contiguous *)
 let intListToMz list =
@@ -71,7 +109,7 @@ let translateOp op =
   | Intersection -> "intersection" | Union -> "union" | Subset -> "subset" | In -> "in"
   | And -> "/\\" | Or -> "\\/" | Implies -> "->" | Iff -> "<->"
   | Add -> "+" | Sub -> "-" | Div -> "div" | Mul -> "*" | Pow -> raise UnexpectedError | Mod -> "mod"
-
+    
 (* translates an expression *)
 let rec translateExpr expr state =
   match expr with
@@ -93,19 +131,7 @@ let rec translateExpr expr state =
        | S_Expr e -> vname)
 
   | E_Access (E_Enum ename, mname) ->
-      let enm = resolveEnum ename state in
-      let (_, idx) = 
-        List.fold_left (fun (i, found) elem ->
-          if elem = mname then
-            (i + 1, i)
-          else
-            (i + 1, found)
-        ) (1, -1) enm.elements
-      in
-      if idx = -1 then
-        raise (EnumMemberNotDefined (ename, mname))
-      else
-        string_of_int idx
+      translateEnumExpr ename mname state
       
   | E_Enum _ ->
       ""
@@ -199,81 +225,148 @@ let cardConstraint vname lbound ubound state =
     E_Op (elb, And, eub)
     
 (* translates a class-member variable *)
-let translateMemberVar cls var state =
+let rec translateMemberVar cls var prev state =
   let (vname, t) = var in
   let state = output (cls.name  ^ "_" ^ vname) state in
   let ccount = count cls.name state in
   let mzn = if state.comments then "\n% ." ^ vname ^ " as " ^ typeToString t ^ "\n" else "" in
   let mzn = mzn ^ "array[1.." ^ string_of_int ccount ^ "] of " in
-  match t with
-  | T_Class cname ->
-      let (indices, state) = newIndices cname ccount state in
-      let mzn = mzn ^ translateType t state ^ ": " ^ cls.name ^ "_" ^ vname ^ " = [" ^ listToMz indices ^ "];\n" in
-      (mzn, state)
-  | T_Set (T_Class cname, lbound, ubound) ->
-      if lbound <> ubound then
-        raise (NotImplemented "variable cardinality sets of objects")
-      else
-        let (indices, state) =
-          (List.fold_left (fun (arr, state) elem ->
-            let (indices, state) = newIndices cname ubound state in
-            let set = "{" ^ (listToMz indices) ^ "}" in
-            (arr @ [set], state)
-          ) ([], state) (seq 1 ccount))
-        in
+  let (mzn, state) =
+    match t with
+    | T_Class cname ->
+        let (indices, state) = newIndices cname ccount state in
         let mzn = mzn ^ translateType t state ^ ": " ^ cls.name ^ "_" ^ vname ^ " = [" ^ listToMz indices ^ "];\n" in
+        (* NOTE: constant, no need for old values :) *)
         (mzn, state)
-  | T_Set (_, lbound, ubound) ->
-      let mzn = mzn ^ "var " ^ translateType t state ^ ": " ^ cls.name ^ "_" ^ vname ^ ";\n" in
-      let expr = cardConstraint vname lbound ubound state in
-      let mzn = 
-        if lbound != -1 then
-          mzn ^ "constraint forall (this in 1.." ^ string_of_int ccount ^ ") (" ^ translateExpr expr state ^ ");\n"
-        else mzn
-      in
-      (mzn, state)
-  | _ ->
-      let mzn = mzn ^ "var " ^ translateType t state ^ ": " ^ cls.name ^ "_" ^ vname ^ ";\n" in
-      (mzn, state)
+    | T_Set (T_Class cname, lbound, ubound) ->
+        if lbound <> ubound then
+          raise (NotImplemented "variable cardinality sets of objects")
+        else
+          let (indices, state) =
+            (List.fold_left (fun (arr, state) elem ->
+              let (indices, state) = newIndices cname ubound state in
+              let set = "{" ^ (listToMz indices) ^ "}" in
+              (arr @ [set], state)
+            ) ([], state) (seq 1 ccount))
+          in
+          let mzn = mzn ^ translateType t state ^ ": " ^ cls.name ^ "_" ^ vname ^ " = [" ^ listToMz indices ^ "];\n" in
+          (* NOTE: constant, no need for old values :) *)
+          (mzn, state)
+    | T_Set (_, lbound, ubound) ->
+        let mzn = mzn ^ "var " ^ translateType t state ^ ": " ^ cls.name ^ "_" ^ vname ^ ";\n" in
+        let expr = cardConstraint vname lbound ubound state in
+        let mzn = 
+          if lbound != -1 then
+            mzn ^ "constraint forall (this in 1.." ^ string_of_int ccount ^ ") (" ^ translateExpr expr state ^ ");\n"
+          else mzn
+        in
+        (mzn, state)
+    | _ ->
+        let mzn = mzn ^ "var " ^ translateType t state ^ ": " ^ cls.name ^ "_" ^ vname ^ ";\n" in
+        (mzn, state)
+  in
+  oldMemberVar mzn ccount cls var prev state
+
+(* translates old value of a class-member variable *)
+and oldMemberVar mzn ccount cls var prev state =
+  let (vname, t) = var in
+  let mzn =
+    match t with
+    | T_Class _
+    | T_Set (T_Class _, _, _) -> mzn
+    | T_Set (_, _, _)
+    | _ ->
+        match prev with
+        | None -> mzn
+        | Some (globals, paths) ->
+          (* get all objs by using ids 1..count in the PathMap, with cname *)
+          mzn ^ "array[1.." ^ string_of_int ccount ^ "] of " ^
+           translateType t state ^ ": " ^ "old_" ^ cls.name ^ "_" ^ vname ^ " = [" ^
+            List.fold_left (fun mzn id ->
+              let path = CSON.PathMap.find (cls.name, id) paths in
+              let parent = CsonSolution.csonPathValue path globals in
+              match parent with
+              | CsonSolution.V_Object obj ->
+                  let delim = if String.length mzn = 0 then "" else ", " in
+                  (try
+                    let value = StrMap.find vname obj.CsonSolution.members in
+                    mzn ^ delim ^ csonToMz value paths globals state
+                  with
+                  | Not_found ->
+                      output_string stderr ("Warning: missing CSON variable: `" ^ vname ^ "` in class `" ^ cls.name ^ "`\n");
+                      (* a placeholder value is needed *)
+                      mzn ^ delim ^ "lb(" ^ cls.name ^ "_" ^ vname ^ ")"
+                  )
+              | _ ->
+                  raise UnexpectedError
+            ) "" (seq 1 (count (rootClass cls state).name state))
+          ^ "];\n" 
+  in
+  (mzn, state)
   
 (* translates a global variable *)
-let rec translateGlobalVar var state =
+let rec translateGlobalVar var prev state =
   let (vname, t) = var in
   let state = output vname state in
   let mzn = if state.comments then "\n% " ^ vname ^ " as " ^ typeToString t ^ "\n" else "" in
-  match t with
-  | T_Class cname ->
-      let (idx, state) = newIndex cname state in
-      let mzn = mzn  ^ translateType t state ^ ": " ^ vname ^ " = " ^ idx ^ ";\n" in
-      (mzn, state)
-  | T_Set (T_Class cname, lbound, ubound) ->
-      if lbound <> ubound then
-        raise (NotImplemented "variable cardinality sets of objects")
-      else
-        let (indices, state) = newIndices cname ubound state in
-        let mzn = mzn ^ translateType t state ^ ": " ^ vname in
-        let mzn = mzn ^ " = {" ^ listToMz indices ^ "};\n" in
+
+  let (mzn, state) =
+    match t with
+    | T_Class cname ->
+        let (idx, state) = newIndex cname state in
+        let mzn = mzn  ^ translateType t state ^ ": " ^ vname ^ " = " ^ idx ^ ";\n" in
         (mzn, state)
-  | T_Set (_, lbound, ubound) ->
-      let mzn = mzn ^ "var " ^ translateType t state ^ ": " ^ vname ^ ";\n" in
-      let expr = cardConstraint vname lbound ubound state in
-      let mzn = 
-        if lbound != -1 then
-          mzn ^ "constraint " ^ translateExpr expr state ^ ";\n"
-        else mzn
-      in
-      (mzn, state)
-  | _ ->
-      let mzn = mzn ^ "var " ^ translateType t state ^ ": " ^ vname ^ ";\n" in
-      (mzn, state)
-      (* constants *)
-      (*let expr = getVarConstantExpr (Var var) state in
-      let mzn = mzn ^ (if isVarConstant (Var var) state then "" else "var ") ^ translateType t state ^ ": " ^ vname ^ 
-        (match expr with
-        | Some expr -> " = " ^ translateExpr expr state ^ ";\n"
-        | None -> ";\n")
-      in
-      (mzn, state)*)
+    | T_Set (T_Class cname, lbound, ubound) ->
+        if lbound <> ubound then
+          raise (NotImplemented "variable cardinality sets of objects")
+        else
+          let (indices, state) = newIndices cname ubound state in
+          let mzn = mzn ^ translateType t state ^ ": " ^ vname in
+          let mzn = mzn ^ " = {" ^ listToMz indices ^ "};\n" in
+          (mzn, state)
+    | T_Set (_, lbound, ubound) ->
+        let mzn = mzn ^ "var " ^ translateType t state ^ ": " ^ vname ^ ";\n" in
+        let expr = cardConstraint vname lbound ubound state in
+        let mzn = 
+          if lbound != -1 then
+            mzn ^ "constraint " ^ translateExpr expr state ^ ";\n"
+          else mzn
+        in
+        (mzn, state)
+    | _ ->
+        let mzn = mzn ^ "var " ^ translateType t state ^ ": " ^ vname ^ ";\n" in
+        (mzn, state)
+        (* constants *)
+        (*let expr = getVarConstantExpr (Var var) state in
+        let mzn = mzn ^ (if isVarConstant (Var var) state then "" else "var ") ^ translateType t state ^ ": " ^ vname ^ 
+          (match expr with
+          | Some expr -> " = " ^ translateExpr expr state ^ ";\n"
+          | None -> ";\n")
+        in
+        (mzn, state)*)
+  in
+  oldGlobalVar mzn var prev state
+  
+and oldGlobalVar mzn var prev state =
+  let (vname, t) = var in
+  let mzn =
+    match t with
+    | T_Class _
+    | T_Set (T_Class _, _, _) -> mzn  (* NOTE: constants :) *)
+    | _ ->
+      match prev with
+      | None -> mzn
+      | Some (globals, paths) ->
+          try
+            let value = StrMap.find vname globals in
+            mzn ^ translateType t state ^ ": old_" ^ vname ^ " = " ^
+              csonToMz value paths globals state ^ ";\n"
+          with
+          | Not_found ->
+              output_string stderr ("Warning: missing CSON variable: `" ^ vname ^ "`\n");
+              mzn
+  in
+  (mzn, state)
     
 (* translates a class-level constraint *)    
 let translateClassConstraint cls con state =
@@ -318,7 +411,7 @@ let checkForAbstractInheritance cls state =
   | None -> ()
 
 (* translates a class *)
-let translateClass cls state =
+let translateClass cls prev state =
   if rawCount cls.name state = 0 then
     ("", state)
   else (
@@ -330,7 +423,7 @@ let translateClass cls state =
       List.fold_left (fun (mzn, state) mbr ->
         let (mzn', state) =
           match mbr with
-          | Var var -> translateMemberVar cls var state
+          | Var var -> translateMemberVar cls var prev state
           | Constraint con -> translateClassConstraint cls con state
           | Enum _ | Class _ -> raise UnexpectedError in
         (mzn  ^ mzn', state)
@@ -343,12 +436,12 @@ let translateEnum enm state =
   ("", state)
 
 (* translates the entire model *)
-let translateModel state =
+let translateModel prev state =
   List.fold_left (fun (mzn, state) decl ->
     let (mzn', state) =
       match decl with
-      | Var var -> translateGlobalVar var state
-      | Class cls -> translateClass cls state
+      | Var var -> translateGlobalVar var prev state
+      | Class cls -> translateClass cls prev state
       | Enum enm -> translateEnum enm state
       | Constraint con -> translateGlobalConstraint con state in
     (mzn  ^ mzn', state)
@@ -357,13 +450,17 @@ let translateModel state =
 (* entry point ********************************************************************)
 
 (* translates the model into a string of MiniZinc *)
-let toMiniZinc csModel showCounting hasComments =
+let toMiniZinc csModel solution paths showCounting hasComments =
   (* init *)
   let scope = { parent = None; node = S_Global} in
   let state = { counts = StrMap.empty; indexes = StrMap.empty; model = csModel; 
                 scope = scope; subclasses = StrMap.empty; show_counting = showCounting; 
                 mzn_output = []; comments = hasComments; maximise_count = 0; set_count = 0 } in
-                
+  let prev =
+    match (solution, paths) with
+    | (Some s, Some p) -> Some (s,p)
+    | _ -> None
+  in
   (* 1st pass: count objects *)
   let state = countModel state in
   if showCounting then
@@ -371,7 +468,7 @@ let toMiniZinc csModel showCounting hasComments =
     "")
   else
     (* 2nd pass: translate to MiniZinc *)
-    let (mzn, state) = translateModel state in
+    let (mzn, state) = translateModel prev state in
     let state =
       if state.maximise_count > 0 then
         output "total_objective" state

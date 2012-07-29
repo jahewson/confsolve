@@ -1,7 +1,8 @@
 #!/bin/sh
 cd bin
 rm temp.mzn
-./csm2mzn $1 $2 > temp.mzn
+echo "csm2mzn..."
+./csm2mzn $* > temp.mzn
 echo "mzn2fzn..."
 mzn2fzn --no-optimize --no-output-ozn temp.mzn
 echo "fz..."

@@ -73,9 +73,7 @@ let main () =
               else
                 let lexbuf = Lexing.from_channel (open_in !csonFilename) in
                 try
-                  let rv = Some (CsonParser.solution CsonLexer.token lexbuf) in
-                  print_endline "* parsed CSON ok :)";  (* TODO *)
-                  rv
+                  Some (CsonParser.solution CsonLexer.token lexbuf)
                 with
                 | Parsing.Parse_error ->
                   let tok = Lexing.lexeme lexbuf in
@@ -92,8 +90,13 @@ let main () =
             else
               let ast = resolveForwardDecls ast in
               typeCheck ast;
+              let paths =
+                match cson with
+                | None -> None
+                | Some _ -> Some (CSON.buildNameMap ast)
+              in
               let ast = decomposeLiterals ast in
-              let mz = toMiniZinc ast !showCounting !hasComments in
+              let mz = toMiniZinc ast cson paths !showCounting !hasComments in
               print_endline mz
         ;;
       

@@ -1,1 +1,7 @@
-val toMiniZinc : ConfSolve.model -> bool -> bool -> string
+val toMiniZinc:
+  ConfSolve.model -> 
+  CsonSolution.solution option ->
+  ConfSolve.varName CSON.PathMap.t option ->
+  bool ->
+  bool ->
+  string

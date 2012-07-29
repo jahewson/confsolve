@@ -136,6 +136,7 @@ and mapVar id_cls (vname, t) state map path =
       let (id, state) = newIndex cname state in
       let id = int_of_string id in
       let map = PathMap.add (cname, id) path map in
+      let map = PathMap.add ((rootClass (resolveClass cname state) state).name, id) path map in
       mapObject id (resolveClass cname state) state map path
       
   | T_Set(T_Class cname, _, ubound) ->
@@ -144,6 +145,7 @@ and mapVar id_cls (vname, t) state map path =
         let id = int_of_string id in
         let path = vname ^ "[" ^ string_of_int i ^ "]" in
         let map = PathMap.add (cname, id) path map in
+        let map = PathMap.add ((rootClass (resolveClass cname state) state).name, id) path map in
         let (map, state) = mapObject id (resolveClass cname state) state map path in
         (map, state, i + 1)
       ) (map, state, 0) indices
@@ -152,7 +154,7 @@ and mapVar id_cls (vname, t) state map path =
       
   | _ -> (map, state)
 
-let buildNameMap state =
+let buildNameMapHelper state =
   let (map, state) =
     List.fold_left (fun (map, state) decl ->
       match decl with
@@ -162,6 +164,15 @@ let buildNameMap state =
     ) (PathMap.empty, state) state.model.declarations
   in map
 
+(* public *)
+let buildNameMap csModel =
+  (* init *)
+  let scope = { parent = None; node = S_Global} in
+  let state = { counts = StrMap.empty; indexes = StrMap.empty; model = csModel; 
+                scope = scope; subclasses = StrMap.empty; show_counting = false; 
+                mzn_output = []; comments = false; maximise_count = 0; set_count = 0 } in
+  buildNameMapHelper state
+  
 (* entry point ********************************************************************)
 
 (* translates the model into a string of CSON *)
@@ -172,5 +183,5 @@ let toCSON csModel solution isDebug =
                 scope = scope; subclasses = StrMap.empty; show_counting = false; 
                 mzn_output = []; comments = false; maximise_count = 0; set_count = 0 } in
 
-  let map = buildNameMap state in
+  let map = buildNameMapHelper state in
   convertModel state solution map

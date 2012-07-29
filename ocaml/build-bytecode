@@ -20,10 +20,6 @@ ocamlc -g -i ConfSolve.ml > ConfSolve.mli
 ocamlc -g -c ConfSolve.mli
 ocamlc -g -c ConfSolve.ml
 
-ocamlc -g -i CsonSolution.ml > CsonSolution.mli
-ocamlc -g -c CsonSolution.mli
-ocamlc -g -c CsonSolution.ml
-
 ocamlyacc -v Parser.mly
 ocamlc -g -c Parser.mli
 ocamlc -g -c Parser.ml
@@ -61,21 +57,25 @@ ocamlc -g -c TypeCheck.ml
 ocamlc -g -c Literals.mli
 ocamlc -g -c Literals.ml
 
+ocamlc -g -c CSON.mli
+ocamlc -g -c CSON.ml
+
+ocamlc -g -i CsonSolution.ml > CsonSolution.mli
+ocamlc -g -c CsonSolution.mli
+ocamlc -g -c CsonSolution.ml
+
 ocamlc -g -c MiniZinc.mli
 ocamlc -g -c MiniZinc.ml
 
 ocamlc -g -c Csm2Mzn.ml
 
-ocamlc -g -o csm2mzn Version.cmo Util.cmo ConfSolve.cmo CsonSolution.cmo Debug.cmo Parser.cmo Lexer.cmo CsonParser.cmo CsonLexer.cmo State.cmo Binding.cmo Counting.cmo Forward.cmo TypeCheck.cmo Literals.cmo MiniZinc.cmo Csm2Mzn.cmo
+ocamlc -g -o csm2mzn str.cma Version.cmo Util.cmo ConfSolve.cmo Debug.cmo Parser.cmo Lexer.cmo CsonParser.cmo CsonLexer.cmo State.cmo Binding.cmo Counting.cmo Forward.cmo TypeCheck.cmo Literals.cmo CSON.cmo CsonSolution.cmo MiniZinc.cmo Csm2Mzn.cmo
 
 #############
 
 ocamlc -g -i SznSolution.ml > SznSolution.mli
 ocamlc -g -c SznSolution.mli
 ocamlc -g -c SznSolution.ml
-
-ocamlc -g -c CSON.mli
-ocamlc -g -c CSON.ml
 
 ocamlyacc -v SznParser.mly
 ocamlc -g -c SznParser.mli
@@ -86,7 +86,7 @@ ocamlc -g -c SznLexer.ml
 
 ocamlc -g -c Szn2Cson.ml
 
-ocamlc -g -o szn2cson Version.cmo Util.cmo ConfSolve.cmo Debug.cmo Parser.cmo Lexer.cmo State.cmo Binding.cmo Counting.cmo Forward.cmo TypeCheck.cmo Literals.cmo CSON.cmo SznSolution.cmo SznParser.cmo SznLexer.cmo Szn2Cson.cmo
+ocamlc -g -o szn2cson str.cma Version.cmo Util.cmo ConfSolve.cmo Debug.cmo Parser.cmo Lexer.cmo State.cmo Binding.cmo Counting.cmo Forward.cmo TypeCheck.cmo Literals.cmo CSON.cmo SznSolution.cmo SznParser.cmo SznLexer.cmo Szn2Cson.cmo
 
 #############
 
