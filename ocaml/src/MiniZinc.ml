@@ -423,11 +423,12 @@ let translateClass cls prev state =
       List.fold_left (fun (mzn, state) mbr ->
         let (mzn', state) =
           match mbr with
-          | Var var -> translateMemberVar cls var prev state
+          | Var var ->
+              translateMemberVar cls var prev state
           | Constraint con -> translateClassConstraint cls con state
           | Enum _ | Class _ -> raise UnexpectedError in
         (mzn  ^ mzn', state)
-      ) (mzn, state) (allMembers cls state)
+      ) (mzn, state) cls.members
     in
     (mzn, popScope state)
   )
