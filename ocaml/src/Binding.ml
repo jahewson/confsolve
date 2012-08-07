@@ -639,3 +639,12 @@ let rec allMembers cls state =
   match cls.super with
   | Some cname -> cls.members @ allMembers (resolveClass cname state) state
   | None -> cls.members
+    
+(* gets all inherited members of a class, as (class,member) pairs *)
+let rec allMembersWithClasses cls state =
+  match cls.super with
+  | Some cname -> (makeMemberClassList cls) @ allMembersWithClasses (resolveClass cname state) state
+  | None -> (makeMemberClassList cls)
+  
+and makeMemberClassList cls =
+  List.map (fun mbr -> (cls, mbr)) cls.members

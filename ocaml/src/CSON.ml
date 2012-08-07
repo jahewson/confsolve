@@ -46,14 +46,14 @@ let convertModel state solution map =
     let state = pushScope (S_Class cls) state in
     let indent = indent + 1 in
     let (cson, state) =
-      List.fold_left (fun (cson, state) mbr ->
+      List.fold_left (fun (cson, state) (cls, mbr) ->
           match mbr with
         | Constraint _ -> (cson, state)
         | Enum _ | Class _ -> raise UnexpectedError
         | Var var ->
             let (cson', state) = convertVar (Some (id, cls)) var state indent in
             (cson ^ cson', state)
-      ) ("", state) (allMembers cls state)
+      ) ("", state) (allMembersWithClasses cls state)
     in
     let pad = String.make ((indent - 1) * 2) ' ' in
     let cson = cls.name ^ " {\n" ^ cson ^ pad ^ "}" in
