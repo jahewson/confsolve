@@ -7,6 +7,8 @@ open Util
 
 module PathMap = Map.Make(struct type t = string * int let compare = compare end)
 
+exception MissingVariable of string
+
 (* CSON *************************************************************************)
 
 let convertModel state solution map =
@@ -71,8 +73,11 @@ let convertModel state solution map =
           | _ -> raise UnexpectedError
      with
     | Not_found ->
-      print_endline ("Error: variable `" ^ vname ^ "` not in solution");
-      exit 1
+        match id_cls with
+        | None ->
+            raise (MissingVariable ("Error: variable `" ^ vname ^ "` not in solution"))
+        | Some (id, cls) ->
+            raise (MissingVariable ("Error: variable `" ^ (cls.name ^ "_" ^ vname) ^ "` not in solution"))
 
   and convertVar id_cls (vname, t) state indent =
     let getValue = getValueHelper id_cls in
@@ -123,29 +128,39 @@ let convertModel state solution map =
 
 let rec mapObject id cls state map path =
   let state = pushScope (S_Class cls) state in
-  List.fold_left (fun (map, state) mbr ->
+  List.fold_left (fun (map, state) (cls, mbr) ->
     match mbr with
     | Constraint _ -> (map, state)
     | Enum _ | Class _ -> raise UnexpectedError
     | Var var -> mapVar (Some (id, cls)) var state map (path ^ "." ^ fst var)
-  ) (map, state) (allMembers cls state)
+  ) (map, state) (allMembersWithClasses cls state)
   
 and mapVar id_cls (vname, t) state map path =
   match t with
   | T_Class cname ->
       let (id, state) = newIndex cname state in
       let id = int_of_string id in
+      
       let map = PathMap.add (cname, id) path map in
+      (*print_endline (cname ^ " " ^ string_of_int id ^ " -> " ^ path);*)
+      
       let map = PathMap.add ((rootClass (resolveClass cname state) state).name, id) path map in
+      (*print_endline ((rootClass (resolveClass cname state) state).name ^ " " ^ string_of_int id ^ " --> " ^ path);*)
+      
       mapObject id (resolveClass cname state) state map path
       
   | T_Set(T_Class cname, _, ubound) ->
       let (indices, state) = newIndices cname ubound state in
       let (map, state, _) = List.fold_left (fun (map, state, i) id ->
         let id = int_of_string id in
-        let path = vname ^ "[" ^ string_of_int i ^ "]" in
+        let path = path ^ "[" ^ string_of_int i ^ "]" in
+        
         let map = PathMap.add (cname, id) path map in
+        (*print_endline (cname ^ " " ^ string_of_int id ^ " => " ^ path);*)
+        
         let map = PathMap.add ((rootClass (resolveClass cname state) state).name, id) path map in
+        (*print_endline ((rootClass (resolveClass cname state) state).name ^ " " ^ string_of_int id ^ " ==> " ^ path);*)
+        
         let (map, state) = mapObject id (resolveClass cname state) state map path in
         (map, state, i + 1)
       ) (map, state, 0) indices
