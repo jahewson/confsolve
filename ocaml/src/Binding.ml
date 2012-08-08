@@ -1,7 +1,6 @@
 open ConfSolve
 open State
 open Util
-open Constants
 
 (* binding ************************************************************************)
 
