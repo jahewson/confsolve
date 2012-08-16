@@ -7,6 +7,7 @@ type enumName = string
 type enumElement = string
 
 type _type =
+  | T_Infer              (* untyped *)
   | T_Symbol of string   (* untyped *)
   | T_Class of className (* typed *)
   | T_Enum of enumName   (* typed *)
@@ -27,14 +28,17 @@ type foldOp =
   | Exists
   | Sum
 
+type var =
+  varName * _type * className option
+
 type expr =
   | E_Symbol of string  (* untyped *)
-  | E_Var of varName    (* typed *)
+  | E_Var of var (* typed *)
   | E_Enum of enumName  (* typed *)
   | E_Access of expr * fieldName
   | E_Op of expr * op * expr
   | E_Card of expr (* e.size *)
-  | E_Fold of foldOp * varName * expr * expr * expr (* collection, where, body *)
+  | E_Fold of foldOp * (varName * _type) * expr * expr * expr (* collection, where, body *)
   | E_Neg of expr 
   | E_Not of expr
   | E_Bool of bool
@@ -42,12 +46,10 @@ type expr =
   | E_Set of expr list
   | E_Paren of expr
   | E_BoolToInt of expr
-
+  
 type _constraint =
   | C_Where of expr
   | C_Maximise of expr
-
-type varDecl = varName * _type
 
 type classDecl = {
    name: className;
@@ -60,6 +62,9 @@ and enumDecl = {
    enumName: enumName;
    elements: enumElement list;
 }
+
+and varDecl =
+  varName * _type
 
 and decl =
  | Class of classDecl

@@ -34,12 +34,16 @@ ocamlc -g -i State.ml > State.mli
 ocamlc -g -c State.mli
 ocamlc -g -c State.ml
 
-ocamlc -g -i Binding.ml > Binding.mli
-ocamlc -g -c Binding.mli
-ocamlc -g -c Binding.ml
+ocamlc -g -i DeclBinding.ml > DeclBinding.mli
+ocamlc -g -c DeclBinding.mli
+ocamlc -g -c DeclBinding.ml
 
 ocamlc -g -c Counting.mli
 ocamlc -g -c Counting.ml
+
+ocamlc -g -i ExprBinding.ml > ExprBinding.mli
+ocamlc -g -c ExprBinding.mli
+ocamlc -g -c ExprBinding.ml
 
 ocamlc -g -c Forward.mli
 ocamlc -g -c Forward.ml
@@ -73,7 +77,7 @@ ocamlc -g -c MiniZinc.ml
 
 ocamlc -g -c Csm2Mzn.ml
 
-ocamlc -g -o csm2mzn str.cma Version.cmo Util.cmo ConfSolve.cmo Debug.cmo Parser.cmo Lexer.cmo CsonParser.cmo CsonLexer.cmo State.cmo Binding.cmo Counting.cmo Forward.cmo TypeCheck.cmo Literals.cmo CSON.cmo CsonSolution.cmo MiniZinc.cmo Csm2Mzn.cmo
+ocamlc -g -o csm2mzn str.cma Version.cmo Util.cmo ConfSolve.cmo Debug.cmo Parser.cmo Lexer.cmo CsonParser.cmo CsonLexer.cmo State.cmo DeclBinding.cmo Counting.cmo ExprBinding.cmo Forward.cmo TypeCheck.cmo Literals.cmo CSON.cmo CsonSolution.cmo MiniZinc.cmo Csm2Mzn.cmo
 
 #############
 
@@ -86,7 +90,7 @@ ocamlc -g -c SznLexer.ml
 
 ocamlc -g -c Szn2Cson.ml
 
-ocamlc -g -o szn2cson str.cma Version.cmo Util.cmo ConfSolve.cmo Debug.cmo Parser.cmo Lexer.cmo State.cmo Binding.cmo Counting.cmo Forward.cmo TypeCheck.cmo Literals.cmo CSON.cmo SznSolution.cmo SznParser.cmo SznLexer.cmo Szn2Cson.cmo
+ocamlc -g -o szn2cson str.cma Version.cmo Util.cmo ConfSolve.cmo Debug.cmo Parser.cmo Lexer.cmo State.cmo DeclBinding.cmo  Counting.cmo ExprBinding.cmo Forward.cmo TypeCheck.cmo Literals.cmo CSON.cmo SznSolution.cmo SznParser.cmo SznLexer.cmo Szn2Cson.cmo
 
 #############
 

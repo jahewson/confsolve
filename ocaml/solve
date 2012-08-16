@@ -1,6 +1,8 @@
 #!/bin/sh
+set -e
+
 cd bin
-rm temp.mzn
+rm -f temp.mzn
 echo "csm2mzn..."
 ./csm2mzn $* > temp.mzn
 echo "mzn2fzn..."

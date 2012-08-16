@@ -1,6 +1,7 @@
 open ConfSolve
 open State
-open Binding
+open DeclBinding
+open ExprBinding
 open Util
 open Counting
 
@@ -16,7 +17,7 @@ let checkConstraint con state =
   | C_Maximise expr -> checkExpr expr state
   
 let checkClassDecl cls state =
-  let state = pushScope (S_Class cls) state in
+  let state = { state with scope = pushScope (S_Class cls) state.scope } in
   List.iter (fun mbr ->
     match mbr with
     | Var var -> () (* requires constants - if var is a T_Int make sure it has a constant assignment *)
@@ -26,7 +27,7 @@ let checkClassDecl cls state =
     
 (* type check expressions - this might be more useful returning a list *)
 let typeCheck csModel =
-  let scope = { parent = None; node = S_Global} in
+  let scope = { parent = None; node = S_Global csModel } in
   let state = { counts = StrMap.empty; indexes = StrMap.empty; model = csModel; 
                 scope = scope; subclasses = StrMap.empty; show_counting = false; 
                 mzn_output = []; comments = false; maximise_count = 0; set_count = 0 } in

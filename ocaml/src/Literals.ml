@@ -1,6 +1,7 @@
 open ConfSolve
 open State
-open Binding
+open DeclBinding
+open ExprBinding
 open Util
 open Counting
 
@@ -8,12 +9,12 @@ open Counting
 
 let rec walkExpr expr decls state =
   match expr with
-  | E_Symbol name -> raise UnexpectedError
+  | E_Symbol _ -> raise UnexpectedError
   
   | E_Fold (op, name, collection, where, body) ->
       let e =
         let (collection, decls, state) = walkExpr collection decls state in
-        let bodyState = pushScope (S_Expr (E_Fold (op, name, collection, where, body))) state in
+        let bodyState = { state with scope = pushScope (S_Expr (E_Fold (op, name, collection, where, body))) state.scope } in
         let (where, decls, state) = walkExpr where decls bodyState in
         let (body, decls, state) = walkExpr body decls bodyState in
         E_Fold (op, name, collection, where, body)
@@ -70,10 +71,9 @@ let rec walkExpr expr decls state =
       else
         (* new variable *)
         let state = { state with set_count = state.set_count + 1 } in
-        let vname = "set__" ^ string_of_int state.set_count in
-        let vexpr = E_Var (vname) in
-      
         let t = typeof expr state in
+        let vname = "set__" ^ string_of_int state.set_count in
+        let vexpr = E_Var (vname, t, None) in
         let v = Var ("set__" ^ string_of_int state.set_count, t) in
         let decls = decls @ [v] in
       
@@ -106,7 +106,7 @@ let walkConstraint con decls state =
       (C_Maximise e, decls, state)
   
 let walkClassDecl cls decls state =
-  let state = pushScope (S_Class cls) state in
+  let state = { state with scope = pushScope (S_Class cls) state.scope } in
   
   let (members, decls, state) =
     List.fold_left (fun (members, decls, state) mbr ->
@@ -124,7 +124,7 @@ let walkClassDecl cls decls state =
   ({ cls with members = members }, decls, state)
 
 let decomposeLiterals csModel =
-  let scope = { parent = None; node = S_Global} in
+  let scope = { parent = None; node = S_Global csModel } in
   let state = { counts = StrMap.empty; indexes = StrMap.empty; model = csModel; 
                 scope = scope; subclasses = StrMap.empty; show_counting = false; 
                 mzn_output = []; comments = false; maximise_count = 0; set_count = 0 } 

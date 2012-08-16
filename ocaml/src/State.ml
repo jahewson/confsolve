@@ -1,10 +1,10 @@
 open Util
 
-(* state ************************************************************************)
+(* scope ************************************************************************)
 
 (* AST nodes with scope *)
 type scopedNode =
-  | S_Global                        (* global *)
+  | S_Global of ConfSolve.model     (* global *)
   | S_Class of ConfSolve.classDecl  (* class *)
   | S_Expr of ConfSolve.expr        (* expression, e.g. E_Fold *)
 
@@ -13,6 +13,8 @@ type scope = {
   parent: scope option;   (* enclosing scope *)
   node: scopedNode;       (* AST node *)
 }
+
+(* state ************************************************************************)
 
 (* translation state *)
 type state = {
@@ -27,15 +29,3 @@ type state = {
   show_counting: bool;            (* debugging - print the object counts *)
   comments: bool;                 (* debugging - comment MiniZinc output *)
 }
-
-(* scope -------------------------------------------------------------------------*)
-
-(* pushes a scope to the state *)
-let pushScope node state =
-  { state with scope = { parent = Some state.scope; node = node; } }
-
-(* pops a scope from the state *)
-let popScope state =
-  match state.scope.parent with
-  | Some parent -> { state with scope = parent }
-  | None -> raise UnexpectedError

@@ -1,6 +1,7 @@
 open ConfSolve
 open State
-open Binding
+open DeclBinding
+open ExprBinding
 open Counting
 open Forward
 open Util
@@ -31,7 +32,7 @@ let rec csonToMz value paths globals state =
 
 (* translates an enum *)
 and translateEnumExpr ename mname state =
-  let enm = resolveEnum ename state in
+  let enm = resolveEnum ename state.scope in
   let (_, idx) = 
     List.fold_left (fun (i, found) elem ->
       if elem = mname then
@@ -63,7 +64,8 @@ let intListToMz list =
 (* translates a type *)
 let rec translateType t state =
   match t with
-  | T_Symbol sym -> raise UnexpectedError
+  | T_Infer
+  | T_Symbol _ -> raise UnexpectedError
   | T_Int -> "int"
   | T_Bool -> "bool"
   | T_BInt set ->
@@ -77,14 +79,13 @@ let rec translateType t state =
               acc ^ "," ^ string_of_int elem
           ) set "") ^ "}"
   | T_Class cname ->
-      let cls = (resolveClass cname state) in
+      let cls = (resolveClass cname state.scope) in
       if cls.isAbstract then raise (AbstractInstance (cls.name)) else ();
       if (count cname state) = 0 then raise (NoInstancesOfClass cname) else ();
       "1.." ^ string_of_int (count cname state)
   | T_Enum ename ->
-      "1.." ^ string_of_int (List.length (resolveEnum ename state).elements)
+      "1.." ^ string_of_int (List.length (resolveEnum ename state.scope).elements)
   | T_Ref cname ->
-      ignore (resolveClass cname state);
       intListToMz (getSubclassIds cname state)
   | T_Set (t, lbound, ubound) ->
       "set of " ^ translateType t state
@@ -113,22 +114,16 @@ let translateOp op =
 (* translates an expression *)
 let rec translateExpr expr state =
   match expr with
-  | E_Symbol sym -> raise UnexpectedError
+  | E_Symbol _ -> raise UnexpectedError
   
-  | E_Var vname ->
-      ignore (resolveVar vname state);
-      (match state.scope.node with
-       | S_Global -> vname
-       | S_Class cls ->
-           let (_, clsDecl) = resolveMemberVar cls vname state in
-           (match clsDecl with
-           | None -> vname
-           | Some clsDecl ->
-             if vname = "this" then
-              "this"
-             else
-               clsDecl.name ^ "_" ^ vname ^ "[this]")
-       | S_Expr e -> vname)
+  | E_Var (vname, t, scope) ->
+      (match scope with
+      | None -> vname
+      | Some cname ->
+          if vname = "this" then
+            "this"
+           else
+             cname ^ "_" ^ vname ^ "[this]")
 
   | E_Access (E_Enum ename, mname) ->
       translateEnumExpr ename mname state
@@ -139,11 +134,11 @@ let rec translateExpr expr state =
       let (cls, (_,mbr), clsDecl) = resolveFieldAccess e mname state in
       cls.name ^ "_" ^ mname ^ "[" ^ translateExpr e state ^ "]"
 
-  | E_Fold (op, name, collection, where, body) ->
-      let bodyState = pushScope (S_Expr expr) state in
-      ignore (resolveVar name bodyState);
+  | E_Fold (op, var, collection, where, body) ->
+      let (vname, vtype) = var in
+      let bodyState = { state with scope = pushScope (S_Expr expr) state.scope } in
       (match typeof collection state with
-      | T_Set (T_Set (_,_,_),_,_) -> raise (SetOfSet name)
+      | T_Set (T_Set (_,_,_),_,_) -> raise (SetOfSet vname)
       | T_Set (t, lbound, ubound) ->
           let isConst =
             match t with
@@ -155,7 +150,7 @@ let rec translateExpr expr state =
               if isConst then
                 E_Bool true
               else
-                (E_Op (E_Var name, In, collection))
+                (E_Op (E_Var (vname, vtype, None), In, collection))
             in
             let guard =
               match (guard, where) with
@@ -184,15 +179,16 @@ let rec translateExpr expr state =
             | T_Enum _ ->
                 translateType t state
             | T_Symbol _
+            | T_Infer
             | T_Set _
             | T_Int -> 
                 raise UnexpectedError
           in
           (match op with | ForAll -> "forall" | Exists -> "exists" | Sum -> "sum")
-          ^ " (" ^ name ^ " in " ^ mznRange ^ ") (\n"
+          ^ " (" ^ vname ^ " in " ^ mznRange ^ ") (\n"
           ^ "    " ^ mzBody ^ "\n"
           ^ "  )"
-      | _ -> raise (ExpectedSet1 name)) 
+      | _ -> raise (ExpectedSet1 vname)) 
 
   | E_Set elist ->
       raise (NotImplemented "set literals")
@@ -216,12 +212,12 @@ let rec translateExpr expr state =
   | E_Paren e -> "(" ^ translateExpr e state ^ ")"
   
 (* creates a cardinality constraint for a set *)
-let cardConstraint vname lbound ubound state =
+let cardConstraint var lbound ubound state =
   if lbound = ubound then
-    E_Op (E_Card (E_Var vname), Eq, E_Int lbound)
+    E_Op (E_Card (E_Var var), Eq, E_Int lbound)
   else
-    let elb = E_Op (E_Card (E_Var vname), Ge, E_Int lbound) in
-    let eub = E_Op (E_Card (E_Var vname), Le, E_Int ubound) in
+    let elb = E_Op (E_Card (E_Var var), Ge, E_Int lbound) in
+    let eub = E_Op (E_Card (E_Var var), Le, E_Int ubound) in
     E_Op (elb, And, eub)
     
 (* translates a class-member variable *)
@@ -254,7 +250,7 @@ let rec translateMemberVar cls var prev state =
           (mzn, state)
     | T_Set (_, lbound, ubound) ->
         let mzn = mzn ^ "var " ^ translateType t state ^ ": " ^ cls.name ^ "_" ^ vname ^ ";\n" in
-        let expr = cardConstraint vname lbound ubound state in
+        let expr = cardConstraint (vname, t, Some cls.name) lbound ubound state in
         let mzn = 
           if lbound != -1 then
             mzn ^ "constraint forall (this in 1.." ^ string_of_int ccount ^ ") (" ^ translateExpr expr state ^ ");\n"
@@ -299,7 +295,7 @@ and oldMemberVar mzn ccount cls var prev state =
                   )
               | _ ->
                   raise UnexpectedError
-            ) "" (seq 1 (count (rootClass cls state).name state))
+            ) "" (seq 1 (count (rootClass cls state.scope).name state))
           ^ "];\n" 
   in
   (mzn, state)
@@ -326,7 +322,7 @@ let rec translateGlobalVar var prev state =
           (mzn, state)
     | T_Set (_, lbound, ubound) ->
         let mzn = mzn ^ "var " ^ translateType t state ^ ": " ^ vname ^ ";\n" in
-        let expr = cardConstraint vname lbound ubound state in
+        let expr = cardConstraint (vname, t, None) lbound ubound state in
         let mzn = 
           if lbound != -1 then
             mzn ^ "constraint " ^ translateExpr expr state ^ ";\n"
@@ -404,7 +400,7 @@ let translateGlobalConstraint con state =
 let checkForAbstractInheritance cls state =
   match cls.super with
   | Some cname ->
-      let super = (resolveClass cname state) in
+      let super = (resolveClass cname state.scope) in
       if not super.isAbstract then
         raise (NotImplemented ("`" ^ cls.name ^ "` inherits non-abstract class `" ^ cname ^ "`"))
       else ()
@@ -416,7 +412,7 @@ let translateClass cls prev state =
     ("", state)
   else (
     checkForAbstractInheritance cls state;
-    let state = pushScope (S_Class cls) state in
+    let state = { state with scope = pushScope (S_Class cls) state.scope } in
     let mzn = if state.comments then "\n%\n% class " ^ cls.name ^ "\n%\n" else ""
     in
     let (mzn, state) = 
@@ -430,7 +426,7 @@ let translateClass cls prev state =
         (mzn  ^ mzn', state)
       ) (mzn, state) cls.members
     in
-    (mzn, popScope state)
+    (mzn, { state with scope = popScope state.scope })
   )
 
 let translateEnum enm state =
@@ -453,7 +449,7 @@ let translateModel prev state =
 (* translates the model into a string of MiniZinc *)
 let toMiniZinc csModel solution paths showCounting hasComments =
   (* init *)
-  let scope = { parent = None; node = S_Global} in
+  let scope = { parent = None; node = S_Global csModel } in
   let state = { counts = StrMap.empty; indexes = StrMap.empty; model = csModel; 
                 scope = scope; subclasses = StrMap.empty; show_counting = showCounting; 
                 mzn_output = []; comments = hasComments; maximise_count = 0; set_count = 0 } in

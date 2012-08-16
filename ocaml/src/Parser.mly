@@ -148,12 +148,12 @@ foldKind:
 | SUM     { Sum }
 
 fold:
-  foldKind id IN expr WHERE expr exprBlock  { E_Fold ($1, $2, $4, $6, $7) }
-| foldKind id IN expr exprBlock             { E_Fold ($1, $2, $4, E_Bool true, $5) }
+  foldKind id IN expr WHERE expr exprBlock  { E_Fold ($1, ($2, T_Infer), $4, $6, $7) }
+| foldKind id IN expr exprBlock             { E_Fold ($1, ($2, T_Infer), $4, E_Bool true, $5) }
 
 count: /* NOTE: parens are needed to avoid shift/reduce conflict */
-  COUNT LPAREN id IN expr WHERE expr RPAREN { E_Fold (Sum, $3, $5, $7, E_Int 1) }
-| COUNT LPAREN id IN expr RPAREN { E_Fold (Sum, $3, $5, E_Bool true, E_Int 1) }
+  COUNT LPAREN id IN expr WHERE expr RPAREN { E_Fold (Sum, ($3, T_Infer), $5, $7, E_Int 1) }
+| COUNT LPAREN id IN expr RPAREN { E_Fold (Sum, ($3, T_Infer), $5, E_Bool true, E_Int 1) }
 
 expr:
 | symbol                       { $1 }

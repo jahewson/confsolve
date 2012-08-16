@@ -4,7 +4,8 @@ open Util
 
 let rec typeToString (t: _type) =
   match t with
-  | T_Symbol s -> "T_Symbol"
+  | T_Infer -> "T_Infer"
+  | T_Symbol s -> "T_Symbol " ^ s
   | T_Int -> "T_Int"
   | T_Bool -> "T_Bool"
   | T_BInt set ->

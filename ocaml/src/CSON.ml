@@ -1,6 +1,6 @@
 open ConfSolve
 open SznSolution
-open Binding
+open DeclBinding
 open Counting
 open State
 open Util
@@ -17,7 +17,7 @@ let convertModel state solution map =
     match (value, t) with
 
     | (V_Int i, T_Enum ename) -> 
-        let enm = resolveEnum ename state in
+        let enm = resolveEnum ename state.scope in
         ename ^ "." ^ List.nth enm.elements (i - 1)
   
     | (V_Int i, T_Ref cname) ->
@@ -45,7 +45,7 @@ let convertModel state solution map =
     | (V_Range _, _) -> raise UnexpectedError 
 
   and convertObject id cls state indent =
-    let state = pushScope (S_Class cls) state in
+    let state = { state with scope = pushScope (S_Class cls) state.scope } in
     let indent = indent + 1 in
     let (cson, state) =
       List.fold_left (fun (cson, state) (cls, mbr) ->
@@ -55,7 +55,7 @@ let convertModel state solution map =
         | Var var ->
             let (cson', state) = convertVar (Some (id, cls)) var state indent in
             (cson ^ cson', state)
-      ) ("", state) (allMembersWithClasses cls state)
+      ) ("", state) (allMembersWithClasses cls state.scope)
     in
     let pad = String.make ((indent - 1) * 2) ' ' in
     let cson = cls.name ^ " {\n" ^ cson ^ pad ^ "}" in
@@ -87,7 +87,7 @@ let convertModel state solution map =
       | T_Class cname ->
           let (id, state) = newIndex cname state in
           let id = int_of_string id in
-          let cls = (resolveClass cname state) in
+          let cls = (resolveClass cname state.scope) in
           let (cson, state) = convertObject id cls state indent in
           let cson = vname ^ ": " ^ cson ^ ",\n" in
           (cson, state)
@@ -96,7 +96,7 @@ let convertModel state solution map =
           let (indices, state) = newIndices cname ubound state in
           let (cson, state, _) = List.fold_left (fun (cson, state, i) id ->
             let id = int_of_string id in
-            let cls = (resolveClass cname state) in
+            let cls = (resolveClass cname state.scope) in
             let (cson', state) = convertObject id cls state (indent + 1) in
             let cson = (if String.length cson = 0 then "" else cson ^ ",\n" ^ pad ^ "  ") ^ cson' in
             (cson, state, i + 1)
@@ -127,13 +127,13 @@ let convertModel state solution map =
 (* name map ***********************************************************************)
 
 let rec mapObject id cls state map path =
-  let state = pushScope (S_Class cls) state in
+  let state = { state with scope = pushScope (S_Class cls) state.scope } in
   List.fold_left (fun (map, state) (cls, mbr) ->
     match mbr with
     | Constraint _ -> (map, state)
     | Enum _ | Class _ -> raise UnexpectedError
     | Var var -> mapVar (Some (id, cls)) var state map (path ^ "." ^ fst var)
-  ) (map, state) (allMembersWithClasses cls state)
+  ) (map, state) (allMembersWithClasses cls state.scope)
   
 and mapVar id_cls (vname, t) state map path =
   match t with
@@ -144,10 +144,10 @@ and mapVar id_cls (vname, t) state map path =
       let map = PathMap.add (cname, id) path map in
       (*print_endline (cname ^ " " ^ string_of_int id ^ " -> " ^ path);*)
       
-      let map = PathMap.add ((rootClass (resolveClass cname state) state).name, id) path map in
-      (*print_endline ((rootClass (resolveClass cname state) state).name ^ " " ^ string_of_int id ^ " --> " ^ path);*)
+      let map = PathMap.add ((rootClass (resolveClass cname state.scope) state.scope).name, id) path map in
+      (*print_endline ((rootClass (resolveClass cname state.scope) state).name ^ " " ^ string_of_int id ^ " --> " ^ path);*)
       
-      mapObject id (resolveClass cname state) state map path
+      mapObject id (resolveClass cname state.scope) state map path
       
   | T_Set(T_Class cname, _, ubound) ->
       let (indices, state) = newIndices cname ubound state in
@@ -158,10 +158,10 @@ and mapVar id_cls (vname, t) state map path =
         let map = PathMap.add (cname, id) path map in
         (*print_endline (cname ^ " " ^ string_of_int id ^ " => " ^ path);*)
         
-        let map = PathMap.add ((rootClass (resolveClass cname state) state).name, id) path map in
-        (*print_endline ((rootClass (resolveClass cname state) state).name ^ " " ^ string_of_int id ^ " ==> " ^ path);*)
+        let map = PathMap.add ((rootClass (resolveClass cname state.scope) state.scope).name, id) path map in
+        (*print_endline ((rootClass (resolveClass cname state.scope) state.scope).name ^ " " ^ string_of_int id ^ " ==> " ^ path);*)
         
-        let (map, state) = mapObject id (resolveClass cname state) state map path in
+        let (map, state) = mapObject id (resolveClass cname state.scope) state map path in
         (map, state, i + 1)
       ) (map, state, 0) indices
       in
@@ -182,7 +182,7 @@ let buildNameMapHelper state =
 (* public *)
 let buildNameMap csModel =
   (* init *)
-  let scope = { parent = None; node = S_Global} in
+  let scope = { parent = None; node = S_Global csModel } in
   let state = { counts = StrMap.empty; indexes = StrMap.empty; model = csModel; 
                 scope = scope; subclasses = StrMap.empty; show_counting = false; 
                 mzn_output = []; comments = false; maximise_count = 0; set_count = 0 } in
@@ -193,7 +193,7 @@ let buildNameMap csModel =
 (* translates the model into a string of CSON *)
 let toCSON csModel solution isDebug =
   (* init *)
-  let scope = { parent = None; node = S_Global} in
+  let scope = { parent = None; node = S_Global csModel } in
   let state = { counts = StrMap.empty; indexes = StrMap.empty; model = csModel; 
                 scope = scope; subclasses = StrMap.empty; show_counting = false; 
                 mzn_output = []; comments = false; maximise_count = 0; set_count = 0 } in

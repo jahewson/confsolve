@@ -1,6 +1,6 @@
 open ConfSolve
 open State
-open Binding
+open DeclBinding
 open Util
 
 (* counting ***********************************************************************)
@@ -37,18 +37,12 @@ let getSubclassIds cname state =
   | Not_found ->
       print_endline cname;
       raise Not_found
- 
-(* get the root class of a subclass *)
-let rec rootClass cls state =
-  match cls.super with
-  | Some cname -> rootClass (resolveClass cname state) state
-  | None -> cls
   
 (* increment object count *)
 let rec countObj cls state =
   (* increment the root count, and fetch the new id *)
-  let state = { state with counts = incr (rootClass cls state).name state.counts } in
-  let id = getCurCount (rootClass cls state).name state 
+  let state = { state with counts = incr (rootClass cls state.scope).name state.counts } in
+  let id = getCurCount (rootClass cls state.scope).name state 
   in
   (* always a subclass of itself *)
   let state = addSubclass cls.name id state
@@ -59,12 +53,12 @@ let rec countObj cls state =
     let state = { state with counts = incr cls.name state.counts }
     in 
     (* now count its superclasses *)
-    countSuperObj id (resolveClass sname state) state
+    countSuperObj id (resolveClass sname state.scope) state
   | None -> state
  
 (* helper - counts superclasses *)
 and countSuperObj id cls state =
-    let root = rootClass cls state in
+    let root = rootClass cls state.scope in
     if root = cls then
       (* root already counted by countObj, so we only need to track the subclasss *)
       addSubclass root.name id state
@@ -77,7 +71,7 @@ and countSuperObj id cls state =
       in
       (* next superclass *)
       match cls.super with
-      | Some sname -> countSuperObj id (resolveClass sname state) state
+      | Some sname -> countSuperObj id (resolveClass sname state.scope) state
       | None -> state
     
 (* count objects for a varDecl *)
@@ -85,25 +79,25 @@ let rec countVarDecl (vname, t) state =
   match t with
   | T_Class cname ->
       if state.show_counting then print_endline ("\n" ^ vname ^ ": " ^ cname) else ();
-      let cls = resolveClass cname state in
+      let cls = resolveClass cname state.scope in
       if cls.isAbstract then raise (AbstractInstance (vname ^ ": " ^ cname)) else ();
       let state = countObj cls state in
       List.fold_left (fun state mbr ->
         match mbr with
         | Var v -> countVarDecl v state
         | _ -> state 
-      ) state (allMembers cls state)
+      ) state (allMembers cls state.scope)
       
   | T_Set (T_Class cname, lbound, ubound) ->
       if state.show_counting then print_endline ("\n" ^ vname ^ ": " ^ cname ^ "[" ^ string_of_int ubound ^ "]") else ();
-      let cls = resolveClass cname state in
+      let cls = resolveClass cname state.scope in
       List.fold_left (fun state elem ->
         let state = countObj cls state in
         List.fold_left (fun state mbr ->
           match mbr with
           | Var v -> countVarDecl v state
           | _ -> state
-        ) state (allMembers cls state)
+        ) state (allMembers cls state.scope)
       ) state (seq 1 ubound)
       
   | _ -> state
@@ -135,12 +129,12 @@ let rawCount cname state =
 
 (* get the object-count for root(`cls`) *)
 let count cname state =
-  let cname = (rootClass (resolveClass cname state) state).name in
+  let cname = (rootClass (resolveClass cname state.scope) state.scope).name in
   rawCount cname state
   
 (* generates a new index for an object of type root(`cls`) *)
 let newIndex cname state =
-  let cname = (rootClass (resolveClass cname state) state).name
+  let cname = (rootClass (resolveClass cname state.scope) state.scope).name
   in
   let indexes' = incr cname state.indexes in
   let str = string_of_int (StrMap.find cname indexes') in
