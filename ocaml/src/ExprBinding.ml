@@ -1,5 +1,6 @@
 open ConfSolve
 open DeclBinding
+open Counting
 open State
 open Util
 
@@ -150,31 +151,11 @@ and getVarConstantExpr var state =
         | Var _ | Enum _ -> e)
   ) None state.model.declarations
 *)            
-(* counting ----------------------------------------------------------------------*)
 
-(* HACK: this belongs in `Counting` *)
-(* checks if counting has been performed *)
-let rec hasCounts state =
-  StrMap.mem "!hasCounts" state.counts
-
-(* HACK: this belongs in `Counting` *)
-(* get the object-count for `cls` *)
-and rawCount cname state =
-  try
-    StrMap.find cname state.counts
-  with
-  | Not_found -> 0
-    
-(* HACK: this belongs in `Counting` *)
-(* get the object-count for root(`cls`) *)
-and count cname state =
-  let cname = (rootClass (resolveClass cname state.scope) state.scope).name in
-  rawCount cname state
-    
 (* types -------------------------------------------------------------------------*)
 
 (* determines the type of an expression, and type-checks it *)
-and typeof expr state =
+let rec typeof expr state =
   let t =
     match expr with
     | E_Symbol _ -> raise UnexpectedError

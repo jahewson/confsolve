@@ -110,7 +110,11 @@ let countModel state =
     | Var v -> countVarDecl v state
     | _ -> state
   ) state state.model.declarations
-
+  
+(* checks if counting has been performed *)
+let rec hasCounts state =
+  StrMap.mem "!hasCounts" state.counts
+    
 (* for debugging *)
 let printCounts state =
   print_endline "\n------------\n";
