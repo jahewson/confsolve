@@ -93,7 +93,7 @@ and comment = parse
      { failwith ("Unterminated comment on line " ^ string_of_int (lineno lexbuf)) }
 
 and line_comment = parse
-  | '\n'
+  | '\n' | eof
       { incr_lineno lexbuf; token lexbuf }
   | _
       { line_comment lexbuf }
