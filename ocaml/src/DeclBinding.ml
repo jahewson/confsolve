@@ -30,10 +30,11 @@ let rec resolveGlobalSymbol name scope =
         | Some _ -> found
         | None ->
             match decl with
-            | Var (vname, t) -> if vname = name then Some decl else None
+            | Var (vname, t) | Param (vname, t) -> if vname = name then Some decl else None
             | Enum enm -> if enm.enumName = name then Some decl else None
             | Class cls -> if cls.name = name then Some decl else None
             | Constraint _ -> found
+            | Block _ -> raise UnexpectedError
       ) None model.declarations
       in
       match found with
@@ -51,9 +52,9 @@ and resolveMemberSymbolImpl noGlobal cls name scope =
       | Some _ -> found
       | None ->
           match mbr with
-          | Var (vname, t) -> if vname = name then Some mbr else None
+          | Var (vname, t) | Param (vname, t) -> if vname = name then Some mbr else None
           | Constraint _ -> found
-          | Enum _ | Class _ -> raise UnexpectedError
+          | Enum _ | Class _ | Block _ -> raise UnexpectedError
     ) None cls.members
     in
     match found with

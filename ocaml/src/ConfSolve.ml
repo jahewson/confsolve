@@ -41,11 +41,13 @@ type expr =
   | E_Fold of foldOp * (varName * _type) * expr * expr * expr (* collection, where, body *)
   | E_Neg of expr 
   | E_Not of expr
+  | E_Old of expr
   | E_Bool of bool
   | E_Int of int
   | E_Set of expr list
   | E_Paren of expr
   | E_BoolToInt of expr
+  | E_Abs of expr
   
 type _constraint =
   | C_Where of expr
@@ -66,11 +68,17 @@ and enumDecl = {
 and varDecl =
   varName * _type
 
+and blockKind =
+  | Change
+  | Init
+
 and decl =
  | Class of classDecl
  | Enum of enumDecl
  | Var of varDecl
+ | Param of varDecl
  | Constraint of _constraint
+ | Block of blockKind * _constraint list
  
 and model = {
  declarations: decl list;

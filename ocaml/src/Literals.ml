@@ -36,6 +36,10 @@ let rec walkExpr expr decls state =
       let (e, decls, state) = (walkExpr e decls state) in
       let e = E_Not e in
       (e, decls, state)
+  | E_Old e ->
+      let (e, decls, state) = (walkExpr e decls state) in
+      let e = E_Old e in
+      (e, decls, state)
   | E_Paren e ->
       let (e, decls, state) = (walkExpr e decls state) in
       let e = E_Paren e in
@@ -47,6 +51,10 @@ let rec walkExpr expr decls state =
   | E_BoolToInt e ->
       let (e, decls, state) = (walkExpr e decls state) in
       let e = E_BoolToInt e in
+      (e, decls, state)
+  | E_Abs e ->
+      let (e, decls, state) = (walkExpr e decls state) in
+      let e = E_Abs e in
       (e, decls, state)
   | E_Bool _ | E_Int _ | E_Var _ | E_Enum _ -> 
       (expr, decls, state)
@@ -111,14 +119,14 @@ let walkClassDecl cls decls state =
   let (members, decls, state) =
     List.fold_left (fun (members, decls, state) mbr ->
       match mbr with
-      | Var var -> (members @ [mbr], decls, state)
+      | Var _ | Param _ -> (members @ [mbr], decls, state)
       | Constraint con ->
           let (con, decls, state) = walkConstraint con decls state in
           let members = members @ [Constraint con] in
           let members = members @ decls in
           (members, decls, state)
           
-      | Enum _ | Class _ -> raise UnexpectedError
+      | Enum _ | Class _ | Block _ -> raise UnexpectedError
     ) ([], decls, state) cls.members
   in
   ({ cls with members = members }, decls, state)
@@ -126,11 +134,11 @@ let walkClassDecl cls decls state =
 let decomposeLiterals csModel =
   let scope = { parent = None; node = S_Global csModel } in
   let state = { counts = StrMap.empty; indexes = StrMap.empty; model = csModel; 
-                scope = scope; subclasses = StrMap.empty; show_counting = false; 
-                mzn_output = []; comments = false; maximise_count = 0; set_count = 0 } 
+                scope = scope; subclasses = StrMap.empty;
+                mzn_output = []; maximise_count = 0; set_count = 0 } 
   in
   (* 1st pass: count objects (needed for `typeof`) *)
-  let state = countModel state
+  let state = countModel false state
   in
   (* 2nd pass: translate literals *)
   { declarations =
@@ -149,7 +157,7 @@ let decomposeLiterals csModel =
               let decls = decls @ [Constraint con] in
               (decls, state)
           
-          | Var _ | Enum _ -> (decls @ [decl], state)
+          | Var _ | Param _ | Enum _ | Block _ -> (decls @ [decl], state)
         ) ([], state) state.model.declarations
       in decls
     }

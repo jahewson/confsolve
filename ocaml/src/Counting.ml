@@ -75,39 +75,39 @@ and countSuperObj id cls state =
       | None -> state
     
 (* count objects for a varDecl *)
-let rec countVarDecl (vname, t) state =
+let rec countVarDecl (vname, t) showCounting state =
   match t with
   | T_Class cname ->
-      if state.show_counting then print_endline ("\n" ^ vname ^ ": " ^ cname) else ();
+      if showCounting then print_endline ("\n" ^ vname ^ ": " ^ cname) else ();
       let cls = resolveClass cname state.scope in
       if cls.isAbstract then raise (AbstractInstance (vname ^ ": " ^ cname)) else ();
       let state = countObj cls state in
       List.fold_left (fun state mbr ->
         match mbr with
-        | Var v -> countVarDecl v state
+        | Var v | Param v -> countVarDecl v showCounting state
         | _ -> state 
       ) state (allMembers cls state.scope)
       
   | T_Set (T_Class cname, lbound, ubound) ->
-      if state.show_counting then print_endline ("\n" ^ vname ^ ": " ^ cname ^ "[" ^ string_of_int ubound ^ "]") else ();
+      if showCounting then print_endline ("\n" ^ vname ^ ": " ^ cname ^ "[" ^ string_of_int ubound ^ "]") else ();
       let cls = resolveClass cname state.scope in
       List.fold_left (fun state elem ->
         let state = countObj cls state in
         List.fold_left (fun state mbr ->
           match mbr with
-          | Var v -> countVarDecl v state
+          | Var v | Param v -> countVarDecl v showCounting state
           | _ -> state
         ) state (allMembers cls state.scope)
       ) state (seq 1 ubound)
       
   | _ -> state
-
+  
 (* count all objects in the model *)
-let countModel state =
+let countModel showCounting state =
   let state = { state with counts = StrMap.add "!hasCounts" 1 state.counts } in
   List.fold_left (fun state d ->
     match d with
-    | Var v -> countVarDecl v state
+    | Var v | Param v -> countVarDecl v showCounting state
     | _ -> state
   ) state state.model.declarations
   

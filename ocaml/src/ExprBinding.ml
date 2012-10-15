@@ -260,7 +260,7 @@ let rec typeof expr state =
     | E_Op (e1, Ge, e2)
     | E_Op (e1, Gt, e2) -> 
       (match (typeof e1 state, typeof e2 state) with
-      | (T_Int, T_Int _)
+      | (T_Int, T_Int)
       | (T_BInt _, T_Int)
       | (T_Int, T_BInt _)
       | (T_BInt _, T_BInt _) -> T_Bool
@@ -336,6 +336,7 @@ let rec typeof expr state =
   
     | E_Neg e ->
         (match typeof e state with
+        | T_Int -> T_Int
         | T_BInt s -> T_BInt (IntSet.fold (fun x s' -> IntSet.add (-x) s') s IntSet.empty)
         | t -> raise (BadlyTypedExpression ("- " ^ typeToString t)))
   
@@ -343,6 +344,9 @@ let rec typeof expr state =
         (match typeof e state with
         | T_Bool _ -> T_Bool
         | t -> raise (BadlyTypedExpression ("not " ^ typeToString t)))
+  
+    | E_Old e ->
+        typeof e state
   
     | E_Card e ->
         (match typeof e state with
@@ -361,6 +365,12 @@ let rec typeof expr state =
         | T_Bool _ -> T_BInt (makeSet 0 1)
         | t -> raise (BadlyTypedExpression ("bool2int(" ^ typeToString t ^ ")")))
   
+    | E_Abs e -> 
+        (match typeof e state with
+        | T_Int -> T_Int
+        | T_BInt s -> T_BInt (IntSet.fold (fun x s' -> IntSet.add (abs x) s') s IntSet.empty)
+        | t -> raise (BadlyTypedExpression ("abs(" ^ typeToString t ^ ")")))
+        
     | E_Fold (op, var, collection, where, body) ->
         let vname = fst var in
         
@@ -416,6 +426,7 @@ let rec typeof expr state =
 (* the type of an int -> int operation *)
 and typeOfIntOpToInt e1 e2 fold foldstr state =
   (match (typeof e1 state, typeof e2 state) with
+  | (T_Int, T_Int)
   | (T_BInt _, T_Int)
   | (T_Int, T_BInt _) -> T_Int
   | (T_BInt s1, T_BInt s2) -> T_BInt (cartesian_product_fold s1 s2 fold)
@@ -522,12 +533,12 @@ and resolveExprSymbol op var collection where body name scope =
     
     let scope = { parent = None; node = S_Global model } in
     let state = { counts = StrMap.empty; indexes = StrMap.empty; model = model; 
-                  scope = scope; subclasses = StrMap.empty; show_counting = false; 
-                  mzn_output = []; comments = false; maximise_count = 0; set_count = 0 } in
+                  scope = scope; subclasses = StrMap.empty;
+                  mzn_output = []; maximise_count = 0; set_count = 0 } in
     let state = { state with scope = pushScope (S_Expr (E_Fold (op, var, collection, where, body))) state.scope } in
     
     (* count objects - hugely inefficient to put this here - TODO: put counts in the AST? *)
-    let state = Counting.countModel state in
+    let state = Counting.countModel false state in
     
     Var (name, elementType (typeof collection state) name)
   else
@@ -572,6 +583,7 @@ and resolveFieldAccess expr fname state =
   let r =
     match resolveMemberSymbolOnly cls fname state.scope with
     | (Var var, Some cls) -> (var, cls)
+    | (Param var, Some cls) -> (var, cls)
     | _ -> raise UnexpectedError
   in
   (snd(r), fst(r), snd(r))

@@ -14,7 +14,7 @@ open Util
 %token <string> ID
 %token <int> INT_LITERAL
 %token EOF
-%token SOL_END
+%token SOL_END ALL_SOL_END
 
 %start solutions
 
@@ -23,7 +23,8 @@ open Util
 %%
 
 solutions:
-  solutionList EOF        { $1 }
+  solutionList EOF              { $1 }
+| solutionList ALL_SOL_END EOF  { $1 }
   
 solutionList:
   solution                { $1 :: [] }
@@ -45,8 +46,8 @@ assignment:
 
 value:
   INT_LITERAL { V_Int $1 }
-| ARRAY1D LPAREN INT_LITERAL DOTS INT_LITERAL COMMA LSQUARE valueList RSQUARE RPAREN { V_Array $8 }
-/*| LSQUARE valueList RSQUARE { V_Array $2 }*/
+/*| ARRAY1D LPAREN INT_LITERAL DOTS INT_LITERAL COMMA LSQUARE valueList RSQUARE RPAREN { V_Array $8 }*/
+| LSQUARE valueList RSQUARE { V_Array $2 }
 | INT_LITERAL DOTS INT_LITERAL { V_Range ($1, $3) }
 | LCURLY valueList RCURLY { V_Set $2 }
 | TRUE { V_Bool true }

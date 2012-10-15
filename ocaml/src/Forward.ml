@@ -12,10 +12,12 @@ let rec forwardExpr expr scope =
 
   | E_Symbol name ->
       (match resolveExpressionSymbolAndDecl name scope with
+      | (Param (vname, t), Some cls)
       | (Var (vname, t), Some cls) -> E_Var (vname, t, Some cls.name)
+      | (Param (vname, t), None)
       | (Var (vname, t), None) -> E_Var (vname, t, None)
       | (Enum _, _) -> E_Enum name
-      | (Class _, _) | (Constraint _, _) -> raise UnexpectedError)
+      | (Class _, _) | (Constraint _, _) | (Block _, _)-> raise UnexpectedError)
       
   | E_Fold (op, var, collection, where, body) ->
       let collection = forwardExpr collection scope in
@@ -31,9 +33,11 @@ let rec forwardExpr expr scope =
   | E_Card e -> E_Card (forwardExpr e scope)
   | E_Neg e -> E_Neg (forwardExpr e scope)
   | E_Not e -> E_Not (forwardExpr e scope)
+  | E_Old e -> E_Old (forwardExpr e scope)
   | E_Paren e -> E_Paren (forwardExpr e scope)
   | E_Access (e, mname) -> E_Access ((forwardExpr e scope), mname)
   | E_BoolToInt e -> E_BoolToInt (forwardExpr e scope)
+  | E_Abs e -> E_Abs (forwardExpr e scope)
   | E_Bool _ | E_Int _ -> expr
   | E_Set elist -> E_Set (List.map (fun e -> forwardExpr e scope) elist)
   
@@ -48,7 +52,7 @@ let rec forwardType t scope =
       (match resolveDeclSymbol name scope with
        | Class cls -> T_Class name
        | Enum enm -> T_Enum name
-       | Constraint _ | Var _ -> raise (ExpectedType name))
+       | Constraint _ | Var _ | Param _ | Block _ -> raise (ExpectedType name))
   | T_Set (t, lb, ub) ->
       T_Set (forwardType t scope, lb, ub)
   | _ -> t
@@ -65,8 +69,9 @@ let forwardClassDecl cls scope =
       List.map (fun mbr ->
         match mbr with
         | Var (vname, t) -> Var (forwardVar (vname, t) scope)
+        | Param (vname, t) -> Param (forwardVar (vname, t) scope)
         | Constraint con -> mbr
-        | Enum _ | Class _ -> raise UnexpectedError
+        | Enum _ | Class _ | Block _ -> raise UnexpectedError
       ) cls.members
     }
 
@@ -76,8 +81,8 @@ let forwardClassUse cls scope =
       List.map (fun mbr ->
         match mbr with
         | Constraint con -> Constraint (forwardConstraint con scope)
-        | Var var -> mbr
-        | Enum _ | Class _ -> raise UnexpectedError
+        | Var _ | Param _ -> mbr
+        | Enum _ | Class _ | Block _ -> raise UnexpectedError
       ) cls.members
     }
 
@@ -90,9 +95,11 @@ let resolveForwardDecls model =
         List.map (fun decl ->
           match decl with
           | Var var -> Var (forwardVar var scope)
+          | Param var -> Param (forwardVar var scope)
           | Class cls -> Class (forwardClassDecl cls scope)
           | Enum enm -> Enum (forwardEnum enm scope)
           | Constraint con -> decl
+          | Block _ -> decl
         ) model.declarations
       }
   in
@@ -104,6 +111,6 @@ let resolveForwardDecls model =
         match decl with
         | Class cls -> Class (forwardClassUse cls scope)
         | Constraint con -> Constraint (forwardConstraint con scope)
-        | Var _ | Enum _ -> decl
+        | Var _ | Param _ | Enum _ | Block _ -> decl
       ) model.declarations
     }

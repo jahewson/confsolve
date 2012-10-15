@@ -26,6 +26,4 @@ type state = {
   set_count: int;                 (* count of set literal variables *)
   scope: scope;                   (* scope tree *)
   mzn_output: string list;        (* MiniZinc `output` variables *)
-  show_counting: bool;            (* debugging - print the object counts *)
-  comments: bool;                 (* debugging - comment MiniZinc output *)
 }

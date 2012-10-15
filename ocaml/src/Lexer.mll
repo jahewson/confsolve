@@ -53,6 +53,11 @@ rule token = parse
  | "where"          { WHERE }
  
  | "bool2int"       { BOOL2INT }
+ | "abs"            { ABS }
+ 
+ | "~"              { OLD }
+ | "change"         { CHANGE }
+ | "init"           { INIT }
  
  | '('              { LPAREN }
  | ')'              { RPAREN }
@@ -65,6 +70,7 @@ rule token = parse
  | ','              { COMMA }
  
  | "var"            { VAR }
+ | "param"          { PARAM }
  | "as"             { AS }
  | "int"            { INT }
  | "bool"           { BOOL }

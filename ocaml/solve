@@ -6,8 +6,10 @@ rm -f temp.mzn
 echo "csm2mzn..."
 ./csm2mzn $* > temp.mzn
 echo "mzn2fzn..."
-mzn2fzn --no-optimize --no-output-ozn temp.mzn
+mzn2fzn --no-optimize temp.mzn
 echo "fz..."
 fz -time 60000 -s temp.fzn > temp.szn
+echo "solns2out..."
+solns2out temp.ozn temp.szn -o temp-out.szn
 echo "szn2cson..."
-./szn2cson $2 temp.szn
+./szn2cson $2 temp-out.szn

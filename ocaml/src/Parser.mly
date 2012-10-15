@@ -11,14 +11,15 @@ open Util
 %token AND OR IMPLIES IFF
 %token NOT FORALL EXISTS SUM COUNT IN
 %token SUBSET UNION INTERSECTION
-%token VAR AS INT BOOL REF DOTS
+%token VAR PARAM AS INT BOOL REF DOTS
 %token DOT COMMA
 %token CLASS EXTENDS ABSTRACT ENUM
 %token SEMICOLON
+%token OLD CHANGE INIT
 %token WHERE MAXIMIZE MINIMIZE
 %token TRUE FALSE
 %token THIS
-%token BOOL2INT
+%token BOOL2INT ABS
 %token <Lexing.position * string> ID
 %token <int> INT_LITERAL
 %token EOL
@@ -28,10 +29,13 @@ open Util
 %left FORALL SUM
 %left AND OR IMPLIES IFF
 %left EQ NEQ GT GE LT LE
+%left ABS
 %left ADD SUB
-%left IN SUBSET UNION INTERSECTION
 %left MUL DIV MOD
+%left IN SUBSET UNION INTERSECTION
 %nonassoc UMINUS NOT
+%left OLD
+%left DOT
 
 %start model
 
@@ -51,13 +55,28 @@ declarationList:
 
 declaration:
   varDecl   SEMICOLON { $1 }
+| paramDecl SEMICOLON { $1 }
 | classDecl { $1 }
-| enumDecl { $1 }
+| enumDecl  { $1 }
 | constraint_ SEMICOLON { $1 }
+| constraintBlock { $1 }
+;
+
+constraintBlock:
+  CHANGE LCURLY constraintList RCURLY   { Block (Change, $3) }
+| INIT   LCURLY constraintList RCURLY   { Block (Init, $3) }
+  
+constraintList:
+  constraintBody SEMICOLON                  { $1 :: [] }
+| constraintList constraintBody SEMICOLON   { $1 @ [$2] }
 ;
 
 varDecl:
   VAR id AS type { Var ($2,$4) }
+;
+
+paramDecl:
+  PARAM id AS type { Param ($2,$4) }
 ;
 
 id:
@@ -129,7 +148,9 @@ memberDeclList:
 
 memberDecl:
 | varDecl     { $1 }
+| paramDecl   { $1 }
 | constraint_ { $1 }
+| constraintBlock { $1 }
 ;
 
 constraint_:
@@ -162,8 +183,10 @@ expr:
 | count                        { $1 }
 | setLiteral                   { $1 }
 | BOOL2INT LPAREN expr RPAREN  { E_BoolToInt $3 }
+| ABS LPAREN expr RPAREN       { E_Abs $3 }
 | SUB expr %prec UMINUS        { E_Neg $2 }
 | NOT expr                     { E_Not $2 }
+| OLD expr                     { E_Old $2 }
 | TRUE                         { E_Bool true }
 | FALSE                        { E_Bool false }
 | INT_LITERAL                  { E_Int $1 }

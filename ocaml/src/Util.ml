@@ -8,6 +8,9 @@ exception NotImplemented of string
 (* map of string *)
 module StrMap = Map.Make(String)
 
+(* map of (string, int) *)
+module StrIntMap = Map.Make(struct type t = string * int let compare = compare end)
+
 (* set of int *)
 module IntSet = Set.Make(struct type t = int let compare = compare end)
 

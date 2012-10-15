@@ -32,11 +32,11 @@ and reference =
 let rec csonRefId reference globals paths =
   let path = refToPath reference in
     let hits =
-      CSON.PathMap.filter (fun key value ->
+      StrIntMap.filter (fun key value ->
         value = path
       ) paths
     in
-    let ((cname,id), _) = CSON.PathMap.choose hits in
+    let ((cname,id), _) = StrIntMap.choose hits in
     id
 
 and csonRefValue reference globals =
@@ -81,5 +81,5 @@ and csonPathValue path globals =
     ) (V_Object { name = "global"; members = globals }) parts
   with
   | e ->
-      print_endline ("Error: CSON value not found `" ^ path ^ "`");
+      output_string stderr ("Warning: CSON value not found `" ^ path ^ "`\n");
       raise e

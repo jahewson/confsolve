@@ -5,6 +5,7 @@ mkdir -p bin
 cd bin
 cp ../src/*.ml* ./
 cp ../examples/*.csm* ./
+cp ../examples/reconfiguration/*.csm* ./
 cp ../tests/*.csm* ./
 
 echo "let sha =\n  \"`git rev-parse --short=10 HEAD`\"" > Version.ml
@@ -34,6 +35,10 @@ ocamlc -g -i State.ml > State.mli
 ocamlc -g -c State.mli
 ocamlc -g -c State.ml
 
+ocamlc -g -i CsonSolution.ml > CsonSolution.mli
+ocamlc -g -c CsonSolution.mli
+ocamlc -g -c CsonSolution.ml
+
 ocamlc -g -i DeclBinding.ml > DeclBinding.mli
 ocamlc -g -c DeclBinding.mli
 ocamlc -g -c DeclBinding.ml
@@ -51,6 +56,10 @@ ocamlc -g -c Forward.ml
 ocamlc -g -c TypeCheck.mli
 ocamlc -g -c TypeCheck.ml
 
+ocamlc -g -i Blocks.ml > Blocks.mli
+ocamlc -g -c Blocks.mli
+ocamlc -g -c Blocks.ml
+
 ocamlc -g -c Literals.mli
 ocamlc -g -c Literals.ml
 
@@ -60,10 +69,6 @@ ocamlc -g -c SznSolution.ml
 
 ocamlc -g -c CSON.mli
 ocamlc -g -c CSON.ml
-
-ocamlc -g -i CsonSolution.ml > CsonSolution.mli
-ocamlc -g -c CsonSolution.mli
-ocamlc -g -c CsonSolution.ml
 
 ocamlyacc -v CsonParser.mly
 ocamlc -g -c CsonParser.mli
@@ -77,7 +82,7 @@ ocamlc -g -c MiniZinc.ml
 
 ocamlc -g -c Csm2Mzn.ml
 
-ocamlc -g -o csm2mzn str.cma Version.cmo Util.cmo ConfSolve.cmo Debug.cmo Parser.cmo Lexer.cmo CsonParser.cmo CsonLexer.cmo State.cmo DeclBinding.cmo Counting.cmo ExprBinding.cmo Forward.cmo TypeCheck.cmo Literals.cmo CSON.cmo CsonSolution.cmo MiniZinc.cmo Csm2Mzn.cmo
+ocamlc -g -o csm2mzn str.cma Version.cmo Util.cmo ConfSolve.cmo Debug.cmo Parser.cmo Lexer.cmo CsonParser.cmo CsonLexer.cmo State.cmo CsonSolution.cmo DeclBinding.cmo Counting.cmo ExprBinding.cmo Forward.cmo TypeCheck.cmo Blocks.cmo Literals.cmo CSON.cmo MiniZinc.cmo Csm2Mzn.cmo
 
 #############
 
@@ -90,7 +95,7 @@ ocamlc -g -c SznLexer.ml
 
 ocamlc -g -c Szn2Cson.ml
 
-ocamlc -g -o szn2cson str.cma Version.cmo Util.cmo ConfSolve.cmo Debug.cmo Parser.cmo Lexer.cmo State.cmo DeclBinding.cmo  Counting.cmo ExprBinding.cmo Forward.cmo TypeCheck.cmo Literals.cmo CSON.cmo SznSolution.cmo SznParser.cmo SznLexer.cmo Szn2Cson.cmo
+ocamlc -g -o szn2cson str.cma Version.cmo Util.cmo ConfSolve.cmo Debug.cmo Parser.cmo Lexer.cmo CsonParser.cmo CsonLexer.cmo State.cmo DeclBinding.cmo  Counting.cmo ExprBinding.cmo Forward.cmo TypeCheck.cmo Blocks.cmo Literals.cmo CSON.cmo SznSolution.cmo SznParser.cmo SznLexer.cmo Szn2Cson.cmo
 
 #############
 

@@ -20,26 +20,27 @@ let checkClassDecl cls state =
   let state = { state with scope = pushScope (S_Class cls) state.scope } in
   List.iter (fun mbr ->
     match mbr with
-    | Var var -> () (* requires constants - if var is a T_Int make sure it has a constant assignment *)
+    | Var _ | Param _ -> () (* requires constants - if var is a T_Int make sure it has a constant assignment *)
     | Constraint con -> checkConstraint con state
-    | Enum _ | Class _ -> raise UnexpectedError
+    | Enum _ | Class _ | Block _ -> raise UnexpectedError
   ) cls.members
     
 (* type check expressions - this might be more useful returning a list *)
 let typeCheck csModel =
   let scope = { parent = None; node = S_Global csModel } in
   let state = { counts = StrMap.empty; indexes = StrMap.empty; model = csModel; 
-                scope = scope; subclasses = StrMap.empty; show_counting = false; 
-                mzn_output = []; comments = false; maximise_count = 0; set_count = 0 } in
+                scope = scope; subclasses = StrMap.empty;
+                mzn_output = []; maximise_count = 0; set_count = 0 } in
   
   (* 1st pass: count objects (needed for `typeof`) *)
-  let state = countModel state
+  let state = countModel false state
   in
   (* 2nd pass: type check *)
   List.iter (fun decl ->
     match decl with
-    | Var var -> () (* requires constants - if var is a T_Int make sure it has a constant assignment *)
+    | Var _ | Param _ -> () (* requires constants - if var is a T_Int make sure it has a constant assignment *)
     | Class cls -> checkClassDecl cls state
     | Enum enm -> ()
     | Constraint con -> checkConstraint con state
+    | Block _ -> raise UnexpectedError
   ) state.model.declarations

@@ -5,13 +5,11 @@ open Counting
 open State
 open Util
 
-module PathMap = Map.Make(struct type t = string * int let compare = compare end)
-
 exception MissingVariable of string
 
 (* CSON *************************************************************************)
 
-let convertModel state solution map =
+let convertModel state solution (params : CsonSolution.solution option) (paths : ConfSolve.varName StrIntMap.t option) map =
   
   let rec convertValue value t state =
     match (value, t) with
@@ -21,7 +19,7 @@ let convertModel state solution map =
         ename ^ "." ^ List.nth enm.elements (i - 1)
   
     | (V_Int i, T_Ref cname) ->
-        "ref " ^ PathMap.find (cname, i) map
+        "ref " ^ StrIntMap.find (cname, i) map
       
     | (V_Bool true, _) -> "true"
     | (V_Bool false, _) -> "false"
@@ -52,9 +50,10 @@ let convertModel state solution map =
           match mbr with
         | Constraint _ -> (cson, state)
         | Enum _ | Class _ -> raise UnexpectedError
-        | Var var ->
+        | Var var | Param var ->
             let (cson', state) = convertVar (Some (id, cls)) var state indent in
             (cson ^ cson', state)
+        | Block _ -> raise UnexpectedError
       ) ("", state) (allMembersWithClasses cls state.scope)
     in
     let pad = String.make ((indent - 1) * 2) ' ' in
@@ -63,6 +62,7 @@ let convertModel state solution map =
 
   and getValueHelper id_cls vname =
     try
+      (* variable *)
       match id_cls with
       | None ->
           StrMap.find vname solution
@@ -72,12 +72,12 @@ let convertModel state solution map =
           | V_Array lst -> List.nth lst (id - 1)
           | _ -> raise UnexpectedError
      with
-    | Not_found ->
-        match id_cls with
-        | None ->
-            raise (MissingVariable ("Error: variable `" ^ vname ^ "` not in solution"))
-        | Some (id, cls) ->
-            raise (MissingVariable ("Error: variable `" ^ (cls.name ^ "_" ^ vname) ^ "` not in solution"))
+        | Not_found ->
+          match id_cls with
+          | None ->
+              raise (MissingVariable ("Error: variable `" ^ vname ^ "` not in solution"))
+          | Some (id, cls) ->
+              raise (MissingVariable ("Error: variable `" ^ (cls.name ^ "_" ^ vname) ^ "` not in solution"))
 
   and convertVar id_cls (vname, t) state indent =
     let getValue = getValueHelper id_cls in
@@ -116,10 +116,11 @@ let convertModel state solution map =
   let (cson, state) =
     List.fold_left (fun (cson, state) decl ->
       match decl with
-      | Var var -> 
+      | Var var | Param var -> 
           let (cson', state) = convertVar None var state 1 in
           (cson ^ cson', state)
       | Class _ | Enum _ | Constraint _ -> (cson, state)
+      | Block _ -> raise UnexpectedError
     ) ("", state) state.model.declarations
   in
   "{\n" ^ cson ^ "}"
@@ -132,7 +133,8 @@ let rec mapObject id cls state map path =
     match mbr with
     | Constraint _ -> (map, state)
     | Enum _ | Class _ -> raise UnexpectedError
-    | Var var -> mapVar (Some (id, cls)) var state map (path ^ "." ^ fst var)
+    | Var var | Param var -> mapVar (Some (id, cls)) var state map (path ^ "." ^ fst var)
+    | Block _ -> raise UnexpectedError
   ) (map, state) (allMembersWithClasses cls state.scope)
   
 and mapVar id_cls (vname, t) state map path =
@@ -141,10 +143,10 @@ and mapVar id_cls (vname, t) state map path =
       let (id, state) = newIndex cname state in
       let id = int_of_string id in
       
-      let map = PathMap.add (cname, id) path map in
+      let map = StrIntMap.add (cname, id) path map in
       (*print_endline (cname ^ " " ^ string_of_int id ^ " -> " ^ path);*)
       
-      let map = PathMap.add ((rootClass (resolveClass cname state.scope) state.scope).name, id) path map in
+      let map = StrIntMap.add ((rootClass (resolveClass cname state.scope) state.scope).name, id) path map in
       (*print_endline ((rootClass (resolveClass cname state.scope) state).name ^ " " ^ string_of_int id ^ " --> " ^ path);*)
       
       mapObject id (resolveClass cname state.scope) state map path
@@ -155,10 +157,10 @@ and mapVar id_cls (vname, t) state map path =
         let id = int_of_string id in
         let path = path ^ "[" ^ string_of_int i ^ "]" in
         
-        let map = PathMap.add (cname, id) path map in
+        let map = StrIntMap.add (cname, id) path map in
         (*print_endline (cname ^ " " ^ string_of_int id ^ " => " ^ path);*)
         
-        let map = PathMap.add ((rootClass (resolveClass cname state.scope) state.scope).name, id) path map in
+        let map = StrIntMap.add ((rootClass (resolveClass cname state.scope) state.scope).name, id) path map in
         (*print_endline ((rootClass (resolveClass cname state.scope) state.scope).name ^ " " ^ string_of_int id ^ " ==> " ^ path);*)
         
         let (map, state) = mapObject id (resolveClass cname state.scope) state map path in
@@ -173,10 +175,11 @@ let buildNameMapHelper state =
   let (map, state) =
     List.fold_left (fun (map, state) decl ->
       match decl with
-      | Var var ->
+      | Var var | Param var ->
           mapVar None var state map (fst var)
       | Class _ | Enum _ | Constraint _ -> (map, state)
-    ) (PathMap.empty, state) state.model.declarations
+      | Block _ -> raise UnexpectedError
+    ) (StrIntMap.empty, state) state.model.declarations
   in map
 
 (* public *)
@@ -184,19 +187,19 @@ let buildNameMap csModel =
   (* init *)
   let scope = { parent = None; node = S_Global csModel } in
   let state = { counts = StrMap.empty; indexes = StrMap.empty; model = csModel; 
-                scope = scope; subclasses = StrMap.empty; show_counting = false; 
-                mzn_output = []; comments = false; maximise_count = 0; set_count = 0 } in
+                scope = scope; subclasses = StrMap.empty;
+                mzn_output = []; maximise_count = 0; set_count = 0 } in
   buildNameMapHelper state
   
 (* entry point ********************************************************************)
 
 (* translates the model into a string of CSON *)
-let toCSON csModel solution isDebug =
+let toCSON csModel solution params paths isDebug =
   (* init *)
   let scope = { parent = None; node = S_Global csModel } in
   let state = { counts = StrMap.empty; indexes = StrMap.empty; model = csModel; 
-                scope = scope; subclasses = StrMap.empty; show_counting = false; 
-                mzn_output = []; comments = false; maximise_count = 0; set_count = 0 } in
+                scope = scope; subclasses = StrMap.empty;
+                mzn_output = []; maximise_count = 0; set_count = 0 } in
 
   let map = buildNameMapHelper state in
-  convertModel state solution map
+  convertModel state solution params paths map

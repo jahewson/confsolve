@@ -15,6 +15,7 @@ rule token = parse
  | "\n"             { incr_lineno lexbuf; token lexbuf }     (* skip whitespace *)
  | "%"              { line_comment lexbuf }
  | "----------"     { SOL_END }
+ | "=========="     { ALL_SOL_END }
  | ['0'-'9' '-']+   { INT_LITERAL(int_of_string (lexeme lexbuf)) }
  | "true"           { TRUE }
  | "false"          { FALSE }
