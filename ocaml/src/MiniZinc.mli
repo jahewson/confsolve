@@ -7,4 +7,5 @@ val toMiniZinc:
   ConfSolve.varName StrIntMap.t option ->
   bool ->
   bool ->
+	bool ->
   string

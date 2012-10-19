@@ -86,7 +86,7 @@ let rec exprToString (expr : ConfSolve.expr) =
 let constraintToString con =
   match con with
   | C_Where e -> "Where " ^ exprToString e
-  | C_Maximise e -> "Maximise " ^ exprToString e
+  | C_Maximise e | C_MinChange_Maximise e -> "Maximise " ^ exprToString e
   
 let printAst (model: ConfSolve.model) =
   print_string "{declarations =\n  [";

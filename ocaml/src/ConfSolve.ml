@@ -52,6 +52,7 @@ type expr =
 type _constraint =
   | C_Where of expr
   | C_Maximise of expr
+	| C_MinChange_Maximise of expr
 
 type classDecl = {
    name: className;

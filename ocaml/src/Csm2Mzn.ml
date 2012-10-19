@@ -41,18 +41,21 @@ let tryParseCson filename =
   
 (* parses command-line args imperatively *)
 let main () =
-  let (filename, paramFilename, solnFilename, showTokens, showAst, showCounting, hasComments, showVersion, minChanges) = 
-      ((ref ""), (ref ""), (ref ""), (ref false), (ref false), (ref false), (ref false), (ref false), (ref false)) 
+  let (filename, paramFilename, solnFilename, showTokens, showAst, 
+			 showCounting, hasComments, showVersion, minChanges, noMinChangeConstraints) = 
+      ((ref ""), (ref ""), (ref ""), (ref false), (ref false), 
+       (ref false), (ref false), (ref false), (ref false), (ref false)) 
   in
   let arglist = [
     ("-c", Arg.Set hasComments, " Comment generated MiniZinc");
+		("-i", Arg.Set noMinChangeConstraints, " Ignore min-changes constraints (requires -m)");
     ("-m", Arg.Set minChanges, " Use the min-changes heuristic");
     ("-p", Arg.Set_string paramFilename, "filename.cson  Paramaters");
     ("-s", Arg.Set_string solnFilename, "filename.cson  Solution to re-configure");
     ("-v", Arg.Set showVersion, " Print version");
     ("--debug-tokens", Arg.Set showTokens, " Print lexer tokens (debug)");
     ("--debug-ast", Arg.Set showAst, " Print AST (debug)");
-    ("--debug-counting", Arg.Set showCounting, " Print object count (debug)")] 
+    ("--debug-counting", Arg.Set showCounting, " Print object count (debug)")]
   in
     let msg = "usage: filename.csm [options]" in
   let _ = (Arg.parse arglist (fun s ->
@@ -62,6 +65,9 @@ let main () =
         raise (Arg.Bad (sprintf "unexpected argument '%s'" s))
       ) msg)
   in
+  if !noMinChangeConstraints && not !minChanges then
+		failwith "-i cannot be used without -m"
+	else ();
   if !showVersion then
     (print_endline "(C) 2011-2012 The University Court of the University of Edinburgh";
      print_endline ("Version 0.6 @ " ^ Version.sha);
@@ -125,7 +131,7 @@ let main () =
           let ast = decomposeLiterals ast in
           
           (* generate MiniZinc *)
-          let mz = toMiniZinc ast soln params paths !showCounting !hasComments in
+          let mz = toMiniZinc ast soln params paths !showCounting !hasComments !noMinChangeConstraints in
           print_endline mz
         ;;
       

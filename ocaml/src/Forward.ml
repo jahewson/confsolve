@@ -45,6 +45,7 @@ let forwardConstraint con scope =
   match con with
   | C_Where expr -> C_Where (forwardExpr expr scope)
   | C_Maximise expr -> C_Maximise (forwardExpr expr scope)
+	| C_MinChange_Maximise expr -> C_MinChange_Maximise (forwardExpr expr scope)
 
 let rec forwardType t scope =
   match t with

@@ -112,7 +112,11 @@ let walkConstraint con decls state =
   | C_Maximise expr ->
       let (e, decls, state) = (walkExpr expr decls state) in
       (C_Maximise e, decls, state)
-  
+
+	| C_MinChange_Maximise expr ->
+      let (e, decls, state) = (walkExpr expr decls state) in
+      (C_MinChange_Maximise e, decls, state)
+
 let walkClassDecl cls decls state =
   let state = { state with scope = pushScope (S_Class cls) state.scope } in
   
@@ -135,7 +139,7 @@ let decomposeLiterals csModel =
   let scope = { parent = None; node = S_Global csModel } in
   let state = { counts = StrMap.empty; indexes = StrMap.empty; model = csModel; 
                 scope = scope; subclasses = StrMap.empty;
-                mzn_output = []; maximise_count = 0; set_count = 0 } 
+                mzn_output = []; set_count = 0 } 
   in
   (* 1st pass: count objects (needed for `typeof`) *)
   let state = countModel false state

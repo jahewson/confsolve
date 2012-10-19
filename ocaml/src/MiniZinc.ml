@@ -9,13 +9,17 @@ open Util
 (* translation ********************************************************************)
 
 (* translates the model into a string of MiniZinc *)
-let toMiniZinc model solution params paths showCounting hasComments =
+let toMiniZinc model solution params paths showCounting hasComments noMinChangeConstraints =
   let prev =
     match (solution, paths) with
     | (Some s, Some p) -> Some (s,p)
     | _ -> None
   in
   
+	let maximiseTerms = ref [] in						(* non-ignored terms to be maximised *)
+	let maximiseTermsIgnored = ref [] in		(* ignored terms to be maximised *)
+	let maximiseCount = ref 0 in						(* counter for generating maximised terms *)
+
   (* CSON value to MiniZinc, almost but not quite a ConfSolve expression *)
   let rec csonToMz value paths globals state =
     match value with
@@ -304,7 +308,7 @@ let toMiniZinc model solution params paths showCounting hasComments =
           | None -> mzn
           | Some (globals, paths) ->
             (* get all objs by using ids 1..count in the path map, with cname *)
-            mzn ^ "array[1.." ^ string_of_int ccount ^ "] of var "
+            mzn ^ "array[1.." ^ string_of_int ccount ^ "] of var " ^
              translateType t state ^ ": " ^ "old_" ^ cls.name ^ "_" ^ vname ^ " = [" ^
               List.fold_left (fun mzn id ->
                 let path = StrIntMap.find (cls.name, id) paths in
@@ -455,12 +459,15 @@ let toMiniZinc model solution params paths showCounting hasComments =
         let mzn =
           "\nconstraint\n  forall (this in " ^ mzIds ^ ") (\n    " ^ translateExpr expr false state ^ "\n  );\n"
         in (mzn, state)
-    | C_Maximise expr ->
-        let state = { state with maximise_count = state.maximise_count + 1 } in
+		| C_Maximise expr | C_MinChange_Maximise expr ->
+				let vname = "objective_" ^ string_of_int (!maximiseCount + 1) in
+				(if noMinChangeConstraints
+					then maximiseTermsIgnored := !maximiseTermsIgnored @ [vname]
+					else maximiseTerms := !maximiseTerms @ [vname]);
+				maximiseCount := !maximiseCount + 1;
         let mzn =
-          "\nvar int: objective_" ^ string_of_int state.maximise_count ^ ";\n" ^
-          "constraint\n  objective_" ^ string_of_int state.maximise_count ^ 
-              " = sum (this in " ^ mzIds ^ ") (\n    " ^ translateExpr expr false state ^ "\n  );\n\n"
+          "\nvar int: " ^ vname ^ ";\n" ^
+          "constraint\n " ^ vname ^ " = sum (this in " ^ mzIds ^ ") (\n    " ^ translateExpr expr false state ^ "\n  );\n\n"
         in (mzn, state)
     
   (* translates a global constraint *)
@@ -471,12 +478,16 @@ let toMiniZinc model solution params paths showCounting hasComments =
           (if hasComments then "\n% global" else "") ^
           "\nconstraint\n  " ^ translateExpr expr false state ^ ";\n"
         in (mzn, state)
-    | C_Maximise expr ->
-        let state = { state with maximise_count = state.maximise_count + 1 } in
+    | C_Maximise expr | C_MinChange_Maximise expr ->
+				let vname = "objective_" ^ string_of_int (!maximiseCount + 1) in
+				(if noMinChangeConstraints
+					then maximiseTermsIgnored := !maximiseTermsIgnored @ [vname]
+					else maximiseTerms := !maximiseTerms @ [vname]);
+				maximiseCount := !maximiseCount + 1;
         let mzn =
           (if hasComments then "\n% global" else "") ^
-          "\nvar int: objective_" ^ string_of_int state.maximise_count ^ ";\n" ^
-          "constraint objective_" ^ string_of_int state.maximise_count ^ " = " ^ translateExpr expr false state ^ ";\n\n"
+          "\nvar int: " ^ vname ^ ";\n" ^
+					"constraint " ^ vname ^ " = " ^ translateExpr expr false state ^ ";\n\n"
         in (mzn, state)
 
   (* raise error on non-abstract inheritance *)
@@ -536,37 +547,55 @@ let toMiniZinc model solution params paths showCounting hasComments =
   let scope = { parent = None; node = S_Global model } in
   let state = { counts = StrMap.empty; indexes = StrMap.empty; model = model; 
                 scope = scope; subclasses = StrMap.empty;
-                mzn_output = []; maximise_count = 0; set_count = 0 } in
+                mzn_output = []; set_count = 0 } in
   (* 1st pass: count objects *)
   let state = countModel showCounting state in
   if showCounting then
     (printCounts state;
     "")
   else
-    (* 2nd pass: translate to MiniZinc *)
+	  (* 2nd pass: translate to MiniZinc *)
+		
+		(* maximiseTerms *)
     let (mzn, state) = translateModel state in
     let state =
-      if state.maximise_count > 0 then
+      if List.length !maximiseTerms > 0 then
         output "total_objective" state
       else state
     in
     let mzn =
       mzn ^
-      if state.maximise_count > 0 then
+      if List.length !maximiseTerms > 0 then
         "var int: total_objective;\n" ^
         "constraint total_objective = " ^
-        List.fold_left (fun acc elem ->
-          let vname = "objective_" ^ string_of_int elem in
-          if String.length acc = 0 then
-            vname
-          else
-            acc ^ " + " ^ vname
-        ) "" (seq 1 state.maximise_count)
+        List.fold_left (fun acc term ->
+          acc ^ (if acc = "" then "" else " + ") ^ term
+        ) "" !maximiseTerms
         ^ ";\n"
       else ""
     in
+		
+		(* maximiseTermsIgnored  *)
+		let state =
+      if List.length !maximiseTermsIgnored > 0 then
+        output "ignored_objective" state
+      else state
+    in
+		let mzn =
+      mzn ^
+      if List.length !maximiseTermsIgnored > 0 then
+        "var int: ignored_objective;\n" ^
+        "constraint ignored_objective = " ^
+        List.fold_left (fun acc term ->
+          acc ^ (if acc = "" then "" else " + ") ^ term
+        ) "" !maximiseTermsIgnored
+        ^ ";\n"
+      else ""
+    in
+		
+		(* goal *)
     let solve =
-      if state.maximise_count = 0 then
+      if List.length !maximiseTerms = 0 then
         "satisfy" 
       else
         "maximize total_objective"

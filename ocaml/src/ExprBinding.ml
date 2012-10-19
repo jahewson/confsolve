@@ -130,7 +130,7 @@ and getVarConstantExpr var state =
       else
         None
     | C_Where e -> None
-    | C_Maximise e -> None
+    | C_Maximise e | C_MinChange_Maximise e -> None
   in
   (* for every constraint *)
   List.fold_left (fun e decl ->
@@ -534,7 +534,7 @@ and resolveExprSymbol op var collection where body name scope =
     let scope = { parent = None; node = S_Global model } in
     let state = { counts = StrMap.empty; indexes = StrMap.empty; model = model; 
                   scope = scope; subclasses = StrMap.empty;
-                  mzn_output = []; maximise_count = 0; set_count = 0 } in
+                  mzn_output = []; set_count = 0 } in
     let state = { state with scope = pushScope (S_Expr (E_Fold (op, var, collection, where, body))) state.scope } in
     
     (* count objects - hugely inefficient to put this here - TODO: put counts in the AST? *)

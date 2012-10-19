@@ -13,7 +13,9 @@ let applyBlockClass cls kind =
     ) [] cls.members
   in Class { cls with members = members }
 
-let applyBlocks (ast : model) (kind : blockKind) : model =
+let applyBlocks (ast : model)
+								(kind : blockKind)
+								: model =
   let decls =
     List.fold_left (fun decls decl ->
       match decl with
@@ -26,7 +28,10 @@ let applyBlocks (ast : model) (kind : blockKind) : model =
  
 (* min-changes ********************************************************************)
 
-let applyMinChanges (ast : model) (globals: CsonSolution.solution) (paths : varName StrIntMap.t) : model =
+let applyMinChanges (ast : model) 
+										(globals: CsonSolution.solution)
+										(paths : varName StrIntMap.t)
+										: model =
 
   let rec applyMinChangesVar cls var =
     let (vname, t) = var in
@@ -45,7 +50,7 @@ let applyMinChanges (ast : model) (globals: CsonSolution.solution) (paths : varN
             | Some cls -> Some cls.name
           in
           let e = E_Op (E_Var (vname, t, cname), Eq, E_Old (E_Var (vname, t, cname))) in
-          Constraint (C_Maximise (E_BoolToInt e)) :: decls
+          Constraint (C_MinChange_Maximise (E_BoolToInt e)) :: decls
       | T_Symbol _| T_Infer ->
           raise UnexpectedError
     in decls

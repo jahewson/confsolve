@@ -14,7 +14,7 @@ let checkExpr expr state =
 let checkConstraint con state =
   match con with
   | C_Where expr -> checkExpr expr state
-  | C_Maximise expr -> checkExpr expr state
+  | C_Maximise expr | C_MinChange_Maximise expr -> checkExpr expr state
   
 let checkClassDecl cls state =
   let state = { state with scope = pushScope (S_Class cls) state.scope } in
@@ -30,7 +30,7 @@ let typeCheck csModel =
   let scope = { parent = None; node = S_Global csModel } in
   let state = { counts = StrMap.empty; indexes = StrMap.empty; model = csModel; 
                 scope = scope; subclasses = StrMap.empty;
-                mzn_output = []; maximise_count = 0; set_count = 0 } in
+                mzn_output = []; set_count = 0 } in
   
   (* 1st pass: count objects (needed for `typeof`) *)
   let state = countModel false state
