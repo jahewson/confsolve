@@ -547,7 +547,7 @@ let toMiniZinc model solution params paths showCounting hasComments noMinChangeC
   let scope = { parent = None; node = S_Global model } in
   let state = { counts = StrMap.empty; indexes = StrMap.empty; model = model; 
                 scope = scope; subclasses = StrMap.empty;
-                mzn_output = []; set_count = 0 } in
+                mzn_output = []; } in
   (* 1st pass: count objects *)
   let state = countModel showCounting state in
   if showCounting then

@@ -30,7 +30,7 @@ let typeCheck csModel =
   let scope = { parent = None; node = S_Global csModel } in
   let state = { counts = StrMap.empty; indexes = StrMap.empty; model = csModel; 
                 scope = scope; subclasses = StrMap.empty;
-                mzn_output = []; set_count = 0 } in
+                mzn_output = []; } in
   
   (* 1st pass: count objects (needed for `typeof`) *)
   let state = countModel false state
