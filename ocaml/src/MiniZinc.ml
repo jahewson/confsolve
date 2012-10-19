@@ -19,6 +19,7 @@ let toMiniZinc model solution params paths showCounting hasComments noMinChangeC
 	let maximiseTerms = ref [] in						(* non-ignored terms to be maximised *)
 	let maximiseTermsIgnored = ref [] in		(* ignored terms to be maximised *)
 	let maximiseCount = ref 0 in						(* counter for generating maximised terms *)
+	let mzn_output = ref [] in							(* buffer for MiniZinc `output` section *)
 
   (* CSON value to MiniZinc, almost but not quite a ConfSolve expression *)
   let rec csonToMz value paths globals state =
@@ -112,8 +113,8 @@ let toMiniZinc model solution params paths showCounting hasComments noMinChangeC
     ) "" list
         
   (* records variables for MiniZinc `output` section *)
-  and output mz_vname state =
-    { state with mzn_output = ("\n  \"" ^ mz_vname ^ " = \", show(" ^ (mz_vname) ^ "), \";\\n\"") :: state.mzn_output }
+  and output mz_vname =
+    mzn_output := ("\n  \"" ^ mz_vname ^ " = \", show(" ^ (mz_vname) ^ "), \";\\n\"") :: !mzn_output
        
    (* translates a binary operator *)
   and translateOp op =
@@ -256,7 +257,7 @@ let toMiniZinc model solution params paths showCounting hasComments noMinChangeC
   (* translates a class-member variable *)
   and translateMemberVar cls var state =
     let (vname, t) = var in
-    let state = output (cls.name  ^ "_" ^ vname) state in
+    output (cls.name  ^ "_" ^ vname);
     let ccount = count cls.name state in
     let mzn = if hasComments then "\n% ." ^ vname ^ " as " ^ typeToString t ^ "\n" else "" in
     let mzn = mzn ^ "array[1.." ^ string_of_int ccount ^ "] of " in
@@ -330,7 +331,7 @@ let toMiniZinc model solution params paths showCounting hasComments noMinChangeC
   
   (* translates a class-member paramater *)
   and translateMemberParam cls (vname, t) state =
-    let state = output (cls.name  ^ "_" ^ vname) state in
+    output (cls.name  ^ "_" ^ vname);
     match (params, paths) with
     | (Some params, Some paths) ->
         (match t with
@@ -367,7 +368,7 @@ let toMiniZinc model solution params paths showCounting hasComments noMinChangeC
   (* translates a global variable *)
   and translateGlobalVar var state =
     let (vname, t) = var in
-    let state = output vname state in
+    output vname;
     let mzn = if hasComments then "\n% " ^ vname ^ " as " ^ typeToString t ^ "\n" else "" in
 
     let (mzn, state) =
@@ -429,7 +430,7 @@ let toMiniZinc model solution params paths showCounting hasComments noMinChangeC
     (mzn, state)
   
   and translateGlobalParam (vname, t) state =
-    let state = output vname state in
+    output vname;
     match (params, paths) with
     | (Some params, Some paths) ->
       (match t with
@@ -546,8 +547,7 @@ let toMiniZinc model solution params paths showCounting hasComments noMinChangeC
   (* init *)
   let scope = { parent = None; node = S_Global model } in
   let state = { counts = StrMap.empty; indexes = StrMap.empty; model = model; 
-                scope = scope; subclasses = StrMap.empty;
-                mzn_output = []; } in
+                scope = scope; subclasses = StrMap.empty; } in
   (* 1st pass: count objects *)
   let state = countModel showCounting state in
   if showCounting then
@@ -558,11 +558,9 @@ let toMiniZinc model solution params paths showCounting hasComments noMinChangeC
 		
 		(* maximiseTerms *)
     let (mzn, state) = translateModel state in
-    let state =
-      if List.length !maximiseTerms > 0 then
-        output "total_objective" state
-      else state
-    in
+    if List.length !maximiseTerms > 0 then
+      output "total_objective"
+    	else ();
     let mzn =
       mzn ^
       if List.length !maximiseTerms > 0 then
@@ -576,11 +574,9 @@ let toMiniZinc model solution params paths showCounting hasComments noMinChangeC
     in
 		
 		(* maximiseTermsIgnored  *)
-		let state =
-      if List.length !maximiseTermsIgnored > 0 then
-        output "ignored_objective" state
-      else state
-    in
+    if List.length !maximiseTermsIgnored > 0 then
+      output "ignored_objective"
+    	else ();
 		let mzn =
       mzn ^
       if List.length !maximiseTermsIgnored > 0 then
@@ -602,5 +598,5 @@ let toMiniZinc model solution params paths showCounting hasComments noMinChangeC
     in
     mzn ^ "\nsolve " ^ solve ^ ";\n\n"
         ^ "output ["
-        ^ (listToMz state.mzn_output)
+        ^ (listToMz !mzn_output)
         ^ "];"

@@ -23,5 +23,4 @@ type state = {
   subclasses: int list StrMap.t;  (* map of superclass names to subclass indices *)
   indexes: int StrMap.t;          (* current index per-class *)
   scope: scope;                   (* scope tree *)
-  mzn_output: string list;        (* MiniZinc `output` variables *)
 }

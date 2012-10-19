@@ -145,8 +145,7 @@ let decomposeLiterals csModel =
 	(* decomposeLiterals ********************************************************)
   let scope = { parent = None; node = S_Global csModel } in
   let state = { counts = StrMap.empty; indexes = StrMap.empty; model = csModel; 
-                scope = scope; subclasses = StrMap.empty;
-                mzn_output = []; } 
+                scope = scope; subclasses = StrMap.empty; } 
   in
   (* 1st pass: count objects (needed for `typeof`) *)
   let state = countModel false state

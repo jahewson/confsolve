@@ -187,8 +187,7 @@ let buildNameMap csModel =
   (* init *)
   let scope = { parent = None; node = S_Global csModel } in
   let state = { counts = StrMap.empty; indexes = StrMap.empty; model = csModel; 
-                scope = scope; subclasses = StrMap.empty;
-                mzn_output = []; } in
+                scope = scope; subclasses = StrMap.empty; } in
   buildNameMapHelper state
   
 (* entry point ********************************************************************)
@@ -198,8 +197,7 @@ let toCSON csModel solution params paths isDebug =
   (* init *)
   let scope = { parent = None; node = S_Global csModel } in
   let state = { counts = StrMap.empty; indexes = StrMap.empty; model = csModel; 
-                scope = scope; subclasses = StrMap.empty;
-                mzn_output = []; } in
+                scope = scope; subclasses = StrMap.empty; } in
 
   let map = buildNameMapHelper state in
   convertModel state solution params paths map
