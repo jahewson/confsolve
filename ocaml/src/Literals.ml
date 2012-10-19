@@ -7,7 +7,7 @@ open Counting
 
 (* decompose literals ***********************************************************)
 
-let decomposeLiterals csModel =
+let decomposeLiterals model =
 	let set_count = ref 0 in		(* count of set literals *)
 	
 	let rec walkExpr expr decls state =
@@ -143,12 +143,12 @@ let decomposeLiterals csModel =
 	in
 
 	(* decomposeLiterals ********************************************************)
-  let scope = { parent = None; node = S_Global csModel } in
-  let state = { counts = StrMap.empty; indexes = StrMap.empty; model = csModel; 
+  let scope = { parent = None; node = S_Global model } in
+  let state = { counts = StrMap.empty; indexes = StrMap.empty;
                 scope = scope; subclasses = StrMap.empty; } 
   in
   (* 1st pass: count objects (needed for `typeof`) *)
-  let state = countModel false state
+  let state = countModel false model state
   in
   (* 2nd pass: translate literals *)
   { declarations =
@@ -168,6 +168,6 @@ let decomposeLiterals csModel =
               (decls, state)
           
           | Var _ | Param _ | Enum _ | Block _ -> (decls @ [decl], state)
-        ) ([], state) state.model.declarations
+        ) ([], state) model.declarations
       in decls
     }

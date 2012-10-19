@@ -26,13 +26,13 @@ let checkClassDecl cls state =
   ) cls.members
     
 (* type check expressions - this might be more useful returning a list *)
-let typeCheck csModel =
-  let scope = { parent = None; node = S_Global csModel } in
-  let state = { counts = StrMap.empty; indexes = StrMap.empty; model = csModel; 
+let typeCheck model =
+  let scope = { parent = None; node = S_Global model } in
+  let state = { counts = StrMap.empty; indexes = StrMap.empty;
                 scope = scope; subclasses = StrMap.empty; } in
   
   (* 1st pass: count objects (needed for `typeof`) *)
-  let state = countModel false state
+  let state = countModel false model state
   in
   (* 2nd pass: type check *)
   List.iter (fun decl ->
@@ -42,4 +42,4 @@ let typeCheck csModel =
     | Enum enm -> ()
     | Constraint con -> checkConstraint con state
     | Block _ -> raise UnexpectedError
-  ) state.model.declarations
+  ) model.declarations

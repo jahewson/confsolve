@@ -18,7 +18,6 @@ type scope = {
 
 (* translation state *)
 type state = {
-  model: ConfSolve.model;         (* ConfSolve AST *)
   counts: int StrMap.t;           (* object counts per-class *)
   subclasses: int list StrMap.t;  (* map of superclass names to subclass indices *)
   indexes: int StrMap.t;          (* current index per-class *)

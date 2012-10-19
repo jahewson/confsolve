@@ -532,12 +532,12 @@ and resolveExprSymbol op var collection where body name scope =
     in
     
     let scope = { parent = None; node = S_Global model } in
-    let state = { counts = StrMap.empty; indexes = StrMap.empty; model = model; 
+    let state = { counts = StrMap.empty; indexes = StrMap.empty;
                   scope = scope; subclasses = StrMap.empty; } in
     let state = { state with scope = pushScope (S_Expr (E_Fold (op, var, collection, where, body))) state.scope } in
     
     (* count objects - hugely inefficient to put this here - TODO: put counts in the AST? *)
-    let state = Counting.countModel false state in
+    let state = Counting.countModel false model state in
     
     Var (name, elementType (typeof collection state) name)
   else

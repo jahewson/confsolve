@@ -1,7 +1,7 @@
 open Util
 
 val getSubclassIds : StrMap.key -> State.state -> int list
-val countModel : bool -> State.state -> State.state
+val countModel : bool -> ConfSolve.model -> State.state -> State.state
 val hasCounts : State.state -> bool
 val printCounts : State.state -> unit
 val rawCount : StrMap.key -> State.state -> int

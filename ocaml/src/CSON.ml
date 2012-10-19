@@ -9,7 +9,7 @@ exception MissingVariable of string
 
 (* CSON *************************************************************************)
 
-let convertModel state solution (params : CsonSolution.solution option) (paths : ConfSolve.varName StrIntMap.t option) map =
+let convertModel model state solution (params : CsonSolution.solution option) (paths : ConfSolve.varName StrIntMap.t option) map =
   
   let rec convertValue value t state =
     match (value, t) with
@@ -121,7 +121,7 @@ let convertModel state solution (params : CsonSolution.solution option) (paths :
           (cson ^ cson', state)
       | Class _ | Enum _ | Constraint _ -> (cson, state)
       | Block _ -> raise UnexpectedError
-    ) ("", state) state.model.declarations
+    ) ("", state) model.declarations
   in
   "{\n" ^ cson ^ "}"
 
@@ -171,7 +171,7 @@ and mapVar id_cls (vname, t) state map path =
       
   | _ -> (map, state)
 
-let buildNameMapHelper state =
+let buildNameMapHelper model state =
   let (map, state) =
     List.fold_left (fun (map, state) decl ->
       match decl with
@@ -179,25 +179,25 @@ let buildNameMapHelper state =
           mapVar None var state map (fst var)
       | Class _ | Enum _ | Constraint _ -> (map, state)
       | Block _ -> raise UnexpectedError
-    ) (StrIntMap.empty, state) state.model.declarations
+    ) (StrIntMap.empty, state) model.declarations
   in map
 
 (* public *)
-let buildNameMap csModel =
+let buildNameMap model =
   (* init *)
-  let scope = { parent = None; node = S_Global csModel } in
-  let state = { counts = StrMap.empty; indexes = StrMap.empty; model = csModel; 
+  let scope = { parent = None; node = S_Global model } in
+  let state = { counts = StrMap.empty; indexes = StrMap.empty;
                 scope = scope; subclasses = StrMap.empty; } in
-  buildNameMapHelper state
+  buildNameMapHelper model state
   
 (* entry point ********************************************************************)
 
 (* translates the model into a string of CSON *)
-let toCSON csModel solution params paths isDebug =
+let toCSON model solution params paths isDebug =
   (* init *)
-  let scope = { parent = None; node = S_Global csModel } in
-  let state = { counts = StrMap.empty; indexes = StrMap.empty; model = csModel; 
+  let scope = { parent = None; node = S_Global model } in
+  let state = { counts = StrMap.empty; indexes = StrMap.empty;
                 scope = scope; subclasses = StrMap.empty; } in
 
-  let map = buildNameMapHelper state in
-  convertModel state solution params paths map
+  let map = buildNameMapHelper model state in
+  convertModel model state solution params paths map

@@ -539,17 +539,17 @@ let toMiniZinc model solution params paths showCounting hasComments noMinChangeC
         | Constraint con -> translateGlobalConstraint con state
         | Block _ -> raise UnexpectedError
       in (mzn  ^ mzn', state)
-    ) ("", state) state.model.declarations
+    ) ("", state) model.declarations
     
   (* entry point ********************************************************************)
   in
   
   (* init *)
   let scope = { parent = None; node = S_Global model } in
-  let state = { counts = StrMap.empty; indexes = StrMap.empty; model = model; 
+  let state = { counts = StrMap.empty; indexes = StrMap.empty;
                 scope = scope; subclasses = StrMap.empty; } in
   (* 1st pass: count objects *)
-  let state = countModel showCounting state in
+  let state = countModel showCounting model state in
   if showCounting then
     (printCounts state;
     "")

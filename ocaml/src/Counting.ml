@@ -103,13 +103,13 @@ let rec countVarDecl (vname, t) showCounting state =
   | _ -> state
   
 (* count all objects in the model *)
-let countModel showCounting state =
+let countModel showCounting model state =
   let state = { state with counts = StrMap.add "!hasCounts" 1 state.counts } in
   List.fold_left (fun state d ->
     match d with
     | Var v | Param v -> countVarDecl v showCounting state
     | _ -> state
-  ) state state.model.declarations
+  ) state model.declarations
   
 (* checks if counting has been performed *)
 let rec hasCounts state =
