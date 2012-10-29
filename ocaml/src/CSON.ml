@@ -9,18 +9,30 @@ exception MissingVariable of string
 
 (* CSON *************************************************************************)
 
-let convertModel model state solution (params : CsonSolution.solution option) (paths : ConfSolve.varName StrIntMap.t option) map =
+let convertModel (model : ConfSolve.model)
+                 (state : State.state)
+                 (solution : SznSolution.solution)
+                 (params : CsonSolution.solution option)
+                 (paths : ConfSolve.varName StrIntMap.t option)
+                 (map : ConfSolve.varName StrIntMap.t)
+                 (isJSON : bool) =
   
   let rec convertValue value t state =
     match (value, t) with
 
     | (V_Int i, T_Enum ename) -> 
         let enm = resolveEnum ename state.scope in
-        ename ^ "." ^ List.nth enm.elements (i - 1)
-  
+        if isJSON then
+          "\"" ^ ename ^ "." ^ List.nth enm.elements (i - 1) ^ "\""
+        else
+          "\"" ^ ename ^ "." ^ List.nth enm.elements (i - 1) ^ "\""
+				
     | (V_Int i, T_Ref cname) ->
-        "ref " ^ StrIntMap.find (cname, i) map
-      
+        if isJSON then
+          "\"@" ^ StrIntMap.find (cname, i) map ^ "\""
+        else
+          "ref " ^ StrIntMap.find (cname, i) map
+    
     | (V_Bool true, _) -> "true"
     | (V_Bool false, _) -> "false"
     | (V_Int i, _) -> string_of_int i
@@ -52,13 +64,18 @@ let convertModel model state solution (params : CsonSolution.solution option) (p
         | Enum _ | Class _ -> raise UnexpectedError
         | Var var | Param var ->
             let (cson', state) = convertVar (Some (id, cls)) var state indent in
+            let cson' = (if cson = "" then "" else ",\n") ^ cson' in
             (cson ^ cson', state)
         | Block _ -> raise UnexpectedError
       ) ("", state) (allMembersWithClasses cls state.scope)
     in
+		let cson = cson ^ "\n" in
     let pad = String.make ((indent - 1) * 2) ' ' in
-    let cson = cls.name ^ " {\n" ^ cson ^ pad ^ "}" in
-    (cson, state)
+    let cson =
+      if isJSON
+        then "{\n" ^ (pad ^ "  \"_class\": \"" ^ cls.name ^ "\",\n") ^ cson ^ pad ^ "}"
+        else cls.name ^ " {\n" ^ cson ^ pad ^ "}"
+		in (cson, state)
 
   and getValueHelper id_cls vname =
     try
@@ -82,6 +99,7 @@ let convertModel model state solution (params : CsonSolution.solution option) (p
   and convertVar id_cls (vname, t) state indent =
     let getValue = getValueHelper id_cls in
     let pad = String.make (indent * 2) ' ' in
+		let fmt_vname = if isJSON then "\"" ^ vname ^ "\"" else vname in
     let (cson, state) =
       match t with
       | T_Class cname ->
@@ -89,7 +107,7 @@ let convertModel model state solution (params : CsonSolution.solution option) (p
           let id = int_of_string id in
           let cls = (resolveClass cname state.scope) in
           let (cson, state) = convertObject id cls state indent in
-          let cson = vname ^ ": " ^ cson ^ ",\n" in
+          let cson = fmt_vname ^ ": " ^ cson in
           (cson, state)
   
       | T_Set(T_Class cname, _, ubound) ->
@@ -102,11 +120,11 @@ let convertModel model state solution (params : CsonSolution.solution option) (p
             (cson, state, i + 1)
           ) ("", state, 0) indices
           in
-          let cson = vname ^ ": [\n" ^  (pad ^ "  ") ^ cson ^ pad ^ "],\n" in
+          let cson = fmt_vname ^ ": [\n" ^  (pad ^ "  ") ^ cson ^ "\n" ^ pad ^ "]" in
           (cson, state)
   
       | _ ->
-          let cson = vname ^ ": " ^ convertValue (getValue vname) t state ^ ",\n" in
+          let cson = fmt_vname ^ ": " ^ convertValue (getValue vname) t state in
           (cson, state)
     in
     (pad ^ cson, state)
@@ -118,12 +136,13 @@ let convertModel model state solution (params : CsonSolution.solution option) (p
       match decl with
       | Var var | Param var -> 
           let (cson', state) = convertVar None var state 1 in
+          let cson' = (if cson = "" then "" else ",\n") ^ cson' in
           (cson ^ cson', state)
       | Class _ | Enum _ | Constraint _ -> (cson, state)
       | Block _ -> raise UnexpectedError
     ) ("", state) model.declarations
   in
-  "{\n" ^ cson ^ "}"
+  "{\n" ^ cson ^ "\n}"
 
 (* name map ***********************************************************************)
 
@@ -200,4 +219,14 @@ let toCSON model solution params paths isDebug =
                 scope = scope; subclasses = StrMap.empty; } in
 
   let map = buildNameMapHelper model state in
-  convertModel model state solution params paths map
+  convertModel model state solution params paths map false
+
+(* translates the model into a string of JSON *)
+let toJSON model solution params paths isDebug =
+  (* init *)
+  let scope = { parent = None; node = S_Global model } in
+  let state = { counts = StrMap.empty; indexes = StrMap.empty;
+                scope = scope; subclasses = StrMap.empty; } in
+
+  let map = buildNameMapHelper model state in
+  convertModel model state solution params paths map true

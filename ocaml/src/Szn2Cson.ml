@@ -29,11 +29,12 @@ let tryParseCson filename =
 
 let main () =
   (* parse command-line arguments imperatively *)
-  let (csmFilename, sznFilename, paramFilename, isDebug) = 
-      ((ref ""), (ref ""), (ref ""), (ref false)) 
+  let (csmFilename, sznFilename, paramFilename, isDebug, useJSON) = 
+      ((ref ""), (ref ""), (ref ""), (ref false), (ref false)) 
   in
   let arglist = [
     ("-p", Arg.Set_string paramFilename, "filename.cson  Paramaters");
+    ("--json", Arg.Set useJSON, " Output JSON instead of CSON");
     ("--debug", Arg.Set isDebug, "print debugging info")] 
   in
   let msg = "usage: filename.csm filename.szn [options]" in
@@ -86,7 +87,11 @@ let main () =
     let sln = List.nth solutions ((List.length solutions) - 1) in
     
     (* generae CSON *)
-    let mz = toCSON ast sln params paths !isDebug in
+    let mz =
+      if !useJSON
+        then toJSON ast sln params paths !isDebug
+        else toCSON ast sln params paths !isDebug
+    in
     print_endline mz
   ;;
  
