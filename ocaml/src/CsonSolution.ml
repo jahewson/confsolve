@@ -41,7 +41,7 @@ let rec csonRefId reference globals paths =
 
 and csonRefValue reference globals =
   let path = refToPath reference in
-  csonPathValue path globals
+  csonPathValue path globals false
 
 and refToPath reference =
   match reference with
@@ -52,7 +52,7 @@ and refToPath reference =
 (* path lookup ********************************************************************)
 
 (* gets a CSON value for a path *)
-and csonPathValue path globals =
+and csonPathValue path globals isQuiet =
   let parts = full_split (regexp "\\.\\|\\[\\|\\]") path in
   let parts =
     List.map (fun part ->
@@ -81,5 +81,7 @@ and csonPathValue path globals =
     ) (V_Object { name = "global"; members = globals }) parts
   with
   | e ->
-      output_string stderr ("Warning: CSON value not found `" ^ path ^ "`\n");
+      if not isQuiet then
+        output_string stderr ("Warning: CSON value not found `" ^ path ^ "`\n")
+        else ();
       raise e
