@@ -8,4 +8,5 @@ val toMiniZinc:
   bool ->
   bool ->
 	bool ->
+	bool ->
   string

@@ -9,7 +9,7 @@ open Util
 (* translation ********************************************************************)
 
 (* translates the model into a string of MiniZinc *)
-let toMiniZinc model solution params paths showCounting hasComments noMinChangeConstraints =
+let toMiniZinc model solution params paths showCounting hasComments noMinChangeConstraints isQuiet =
   let prev =
     match (solution, paths) with
     | (Some s, Some p) -> Some (s,p)
@@ -322,7 +322,9 @@ let toMiniZinc model solution params paths showCounting hasComments noMinChangeC
 	                    mzn ^ delim ^ csonToMz value paths globals state
 	                | _ -> raise UnexpectedError
 								with _ ->
-                  output_string stderr ("Warning: missing solution variable: `" ^ vname ^ "` in class `" ^ cls.name ^ "`\n");
+                  if not isQuiet
+                    then output_string stderr ("Warning: missing solution variable: `" ^ vname ^ "` in class `" ^ cls.name ^ "`\n")
+                    else ();
 									mzn ^ delim ^ "_" (* _ is MiniZinc's anonymous variable *)
               ) "" (seq 1 (count (rootClass cls state.scope).name state))
             ^ "];\n" 
@@ -424,7 +426,9 @@ let toMiniZinc model solution params paths showCounting hasComments noMinChangeC
                 csonToMz value paths globals state ^ ";\n"
             with
             | Not_found ->
-                output_string stderr ("Warning: missing solution variable: `" ^ vname ^ "`\n");
+                if not isQuiet
+                  then output_string stderr ("Warning: missing solution variable: `" ^ vname ^ "`\n")
+                  else ();
                 mzn
     in
     (mzn, state)

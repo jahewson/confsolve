@@ -41,16 +41,17 @@ let tryParseCson filename =
   
 (* parses command-line args imperatively *)
 let main () =
-  let (filename, paramFilename, solnFilename, showTokens, showAst, 
-			 showCounting, hasComments, showVersion, minChanges, noMinChangeConstraints) = 
-      ((ref ""), (ref ""), (ref ""), (ref false), (ref false), 
-       (ref false), (ref false), (ref false), (ref false), (ref false)) 
+  let (filename, paramFilename, solnFilename, showTokens, showAst, showCounting,
+       hasComments, showVersion, minChanges, noMinChangeConstraints, isQuiet) = 
+      ((ref ""), (ref ""), (ref ""), (ref false), (ref false), (ref false),
+       (ref false), (ref false), (ref false), (ref false), (ref false))
   in
   let arglist = [
     ("-c", Arg.Set hasComments, " Comment generated MiniZinc");
 		("-i", Arg.Set noMinChangeConstraints, " Ignore min-changes constraints (requires -m)");
     ("-m", Arg.Set minChanges, " Use the min-changes heuristic");
     ("-p", Arg.Set_string paramFilename, "filename.cson  Paramaters");
+    ("-q", Arg.Set isQuiet, " Quiet mode (no warnings)");
     ("-s", Arg.Set_string solnFilename, "filename.cson  Solution to re-configure");
     ("-v", Arg.Set showVersion, " Print version");
     ("--debug-tokens", Arg.Set showTokens, " Print lexer tokens (debug)");
@@ -131,7 +132,7 @@ let main () =
           let ast = decomposeLiterals ast in
           
           (* generate MiniZinc *)
-          let mz = toMiniZinc ast soln params paths !showCounting !hasComments !noMinChangeConstraints in
+          let mz = toMiniZinc ast soln params paths !showCounting !hasComments !noMinChangeConstraints !isQuiet in
           print_endline mz
         ;;
       
