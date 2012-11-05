@@ -97,9 +97,12 @@ let main () =
         
         (* apply conditional blocks *)
         let ast =
-          match soln with
-          | None -> applyBlocks ast Init
-          | _ -> applyBlocks ast Change
+          if !minChanges then
+            removeBlocks ast
+          else
+            match soln with
+            | None -> applyBlocks ast Init
+            | _ -> applyBlocks ast Change
         in
         
         (* process *)

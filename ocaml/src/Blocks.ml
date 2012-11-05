@@ -1,7 +1,7 @@
 open ConfSolve
 open Util
 
-(* init/change blocks *************************************************************)
+(* apply init/change blocks *******************************************************)
 
 let applyBlockClass cls kind =
   let members =
@@ -21,6 +21,28 @@ let applyBlocks (ast : model)
       match decl with
       | Class cls -> applyBlockClass cls kind :: decls
       | Block (k, ctrs) when k = kind -> decls @ List.map (fun ctr -> Constraint ctr) ctrs
+      | Block _ -> decls
+      | _ -> decl :: decls
+    ) [] ast.declarations
+  in { declarations = decls }
+
+(* remove init/change blocks ******************************************************)
+
+let removeBlockClass cls =
+  let members =
+    List.fold_left (fun members mbr ->
+      match mbr with
+      | Block _ -> members
+      | _ -> mbr :: members
+    ) [] cls.members
+  in Class { cls with members = members }
+
+let removeBlocks (ast : model)
+								 : model =
+  let decls =
+    List.fold_left (fun decls decl ->
+      match decl with
+      | Class cls -> removeBlockClass cls :: decls
       | Block _ -> decls
       | _ -> decl :: decls
     ) [] ast.declarations
