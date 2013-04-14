@@ -86,7 +86,14 @@ let convertModel (model : ConfSolve.model)
       | Some (id, cls) ->
           let values = StrMap.find (cls.name ^ "_" ^ vname) solution in
           match values with
-          | V_Array lst -> List.nth lst (id - 1)
+          | V_Array lst ->
+              (try
+                List.nth lst (id - 1)
+              with _ ->
+                print_endline ("ERROR: List.nth lst " ^ string_of_int (id - 1));
+                print_endline ("FOR: " ^ cls.name ^ "_" ^ vname);
+                print_endline ("REASON: this is probably not the CSON solution for this CSM model\n");
+                raise Not_found)
           | _ -> raise UnexpectedError
      with
         | Not_found ->
