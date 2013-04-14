@@ -446,7 +446,7 @@ let toMiniZinc model solution params paths showCounting hasComments noMinChangeC
           let mzn =
             try
               let value = StrMap.find vname params in
-              translateType t state ^ ": old_" ^ vname ^ " = " ^
+                translateType t state ^ ": " ^ vname ^ " = " ^
                 csonToMz value paths params state ^ ";\n"
             with
             | Not_found ->
