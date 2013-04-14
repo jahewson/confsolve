@@ -13,7 +13,7 @@ function run {
     if [ $? -ne 0 ]; then
       result="FAIL--EXIT"
     else
-        result="PASS"
+      result="PASS"
     fi
 
     if [ $result = "PASS" ]; then
