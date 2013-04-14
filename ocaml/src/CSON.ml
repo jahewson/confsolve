@@ -57,6 +57,7 @@ let convertModel (model : ConfSolve.model)
   and convertObject id cls state indent =
     let state = { state with scope = pushScope (S_Class cls) state.scope } in
     let indent = indent + 1 in
+    let allMembers = (allMembersWithClasses cls state.scope) in
     let (cson, state) =
       List.fold_left (fun (cson, state) (cls, mbr) ->
           match mbr with
@@ -67,13 +68,15 @@ let convertModel (model : ConfSolve.model)
             let cson' = (if cson = "" then "" else ",\n") ^ cson' in
             (cson ^ cson', state)
         | Block _ -> raise UnexpectedError
-      ) ("", state) (allMembersWithClasses cls state.scope)
+      ) ("", state) allMembers
     in
 		let cson = cson ^ "\n" in
     let pad = String.make ((indent - 1) * 2) ' ' in
     let cson =
       if isJSON
-        then "{\n" ^ (pad ^ "  \"_class\": \"" ^ cls.name ^ "\",\n") ^ cson ^ pad ^ "}"
+        then "{\n" ^ (pad ^ "  \"_class\": \"" ^ cls.name ^ "\"" ^
+                (if (List.length allMembers) = 0 then "" else ",") ^ "\n")
+                ^ cson ^ pad ^ "}"
         else cls.name ^ " {\n" ^ cson ^ pad ^ "}"
 		in (cson, state)
 
