@@ -148,7 +148,7 @@ let newIndex cname state =
 let newIndices cname num state =
   let rec next i indices state =
     let (index, state) = newIndex cname state in
-    let indices =  indices @ [index] in
+    let indices = indices @ [index] in
     if i < num then
       next (i+1) indices state
     else
