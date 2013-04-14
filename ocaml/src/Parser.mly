@@ -177,6 +177,7 @@ count: /* NOTE: parens are needed to avoid shift/reduce conflict */
 | COUNT LPAREN id IN expr RPAREN { E_Fold (Sum, ($3, T_Infer), $5, E_Bool true, E_Int 1) }
 
 expr:
+| expr DOT id                  { if $3 = "size" then E_Card $1 else E_Access ($1, $3) }
 | symbol                       { $1 }
 | binaryExpr                   { $1 }
 | fold                         { $1 }
@@ -204,7 +205,7 @@ setElementList:
 
 symbol:
   id                      { E_Symbol $1 }
-| symbol DOT id           { if $3 = "size" then E_Card $1 else E_Access ($1, $3) }
+;
 
 binaryExpr:
   expr EQ expr            { E_Op ($1, Eq, $3) }
