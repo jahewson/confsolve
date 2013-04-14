@@ -25,7 +25,7 @@ let convertModel (model : ConfSolve.model)
         if isJSON then
           "\"" ^ ename ^ "." ^ List.nth enm.elements (i - 1) ^ "\""
         else
-          "\"" ^ ename ^ "." ^ List.nth enm.elements (i - 1) ^ "\""
+          ename ^ "." ^ List.nth enm.elements (i - 1)
 				
     | (V_Int i, T_Ref cname) ->
         if isJSON then
