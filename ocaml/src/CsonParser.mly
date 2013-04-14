@@ -25,7 +25,8 @@ solution:
 ;
 
 assignmentMap:
-  assignmentMapE optionalComma { $1 }
+                               { StrMap.empty }
+| assignmentMapE optionalComma { $1 }
 
 optionalComma:
           { }
