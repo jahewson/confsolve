@@ -450,11 +450,11 @@ let toMiniZinc model solution params paths showCounting hasComments noMinChangeC
                 csonToMz value paths params state ^ ";\n"
             with
             | Not_found ->
-                output_string stderr ("Error: missing paramater: `" ^ vname ^ "`\n");
+                output_string stderr ("Error: missing parameter: `" ^ vname ^ "`\n");
                 exit 1
             in (mzn, state))
     | (_, _) ->
-        failwith "this model uses paramaters but the -p flag was not set"
+        failwith "this model uses parameters but the -p flag was not set"
       
   (* translates a class-level constraint *)    
   and translateClassConstraint cls con state =
