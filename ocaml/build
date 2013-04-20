@@ -1,0 +1,144 @@
+#!/bin/sh
+set -e -x
+
+# variables
+FLAGS=-g       # debug
+LINKER=ocamlc  # bytecode
+DEPS=str.cma   # String
+EXT=cmo
+
+if [ $1 = "native" ]; then
+  FLAGS=
+  LINKER=ocamlopt
+  DEPS=str.cmxa
+  EXT=ml
+fi
+
+# bin dir
+mkdir -p bin
+
+# copy examples/tests
+cd bin
+cp ../examples/*.csm* ./
+cp ../examples/reconfiguration/*.csm* ./
+cp ../tests/*.csm* ./
+cd ..
+
+# build in .tmp
+mkdir -p .tmp
+cd .tmp
+cp ../src/*.ml* ./
+
+# git sha-1
+if which git >/dev/null; then
+    echo "let sha =\n  \"`git rev-parse --short=10 HEAD`\"" > Version.ml
+else
+    echo "let sha =\n  \"n/a\"" > Version.ml
+fi
+
+ocamlc $FLAGS -i Version.ml > Version.mli
+ocamlc $FLAGS -c Version.mli
+ocamlc $FLAGS -c Version.ml
+
+ocamlc $FLAGS -i Util.ml > Util.mli
+ocamlc $FLAGS -c Util.mli
+ocamlc $FLAGS -c Util.ml
+
+ocamlc $FLAGS -i ConfSolve.ml > ConfSolve.mli
+ocamlc $FLAGS -c ConfSolve.mli
+ocamlc $FLAGS -c ConfSolve.ml
+
+ocamlyacc -v Parser.mly
+ocamlc $FLAGS -c Parser.mli
+ocamlc $FLAGS -c Parser.ml
+
+ocamllex -q Lexer.mll
+ocamlc $FLAGS -c Lexer.ml
+
+ocamlc $FLAGS -c Debug.mli
+ocamlc $FLAGS -c Debug.ml
+
+ocamlc $FLAGS -i State.ml > State.mli
+ocamlc $FLAGS -c State.mli
+ocamlc $FLAGS -c State.ml
+
+ocamlc $FLAGS -i CsonSolution.ml > CsonSolution.mli
+ocamlc $FLAGS -c CsonSolution.mli
+ocamlc $FLAGS -c CsonSolution.ml
+
+ocamlc $FLAGS -i DeclBinding.ml > DeclBinding.mli
+ocamlc $FLAGS -c DeclBinding.mli
+ocamlc $FLAGS -c DeclBinding.ml
+
+ocamlc $FLAGS -c Counting.mli
+ocamlc $FLAGS -c Counting.ml
+
+ocamlc $FLAGS -i ExprBinding.ml > ExprBinding.mli
+ocamlc $FLAGS -c ExprBinding.mli
+ocamlc $FLAGS -c ExprBinding.ml
+
+ocamlc $FLAGS -c Forward.mli
+ocamlc $FLAGS -c Forward.ml
+
+ocamlc $FLAGS -c TypeCheck.mli
+ocamlc $FLAGS -c TypeCheck.ml
+
+ocamlc $FLAGS -i Blocks.ml > Blocks.mli
+ocamlc $FLAGS -c Blocks.mli
+ocamlc $FLAGS -c Blocks.ml
+
+ocamlc $FLAGS -c Literals.mli
+ocamlc $FLAGS -c Literals.ml
+
+ocamlc $FLAGS -i SznSolution.ml > SznSolution.mli
+ocamlc $FLAGS -c SznSolution.mli
+ocamlc $FLAGS -c SznSolution.ml
+
+ocamlc $FLAGS -c CSON.mli
+ocamlc $FLAGS -c CSON.ml
+
+ocamlyacc -v CsonParser.mly
+ocamlc $FLAGS -c CsonParser.mli
+ocamlc $FLAGS -c CsonParser.ml
+
+ocamllex -q CsonLexer.mll
+ocamlc $FLAGS -c CsonLexer.ml
+
+ocamlc $FLAGS -c MiniZinc.mli
+ocamlc $FLAGS -c MiniZinc.ml
+
+ocamlc $FLAGS -c Csm2Mzn.ml
+
+$LINKER $FLAGS -o csm2mzn $DEPS Version.$EXT Util.$EXT ConfSolve.$EXT Debug.$EXT Parser.$EXT Lexer.$EXT CsonParser.$EXT CsonLexer.$EXT State.$EXT CsonSolution.$EXT DeclBinding.$EXT Counting.$EXT ExprBinding.$EXT Forward.$EXT TypeCheck.$EXT Blocks.$EXT Literals.$EXT CSON.$EXT MiniZinc.$EXT Csm2Mzn.$EXT
+
+if [ $1 = "native" ]; then
+  strip csm2mzn
+fi
+
+cp csm2mzn ../bin
+
+#############
+
+ocamlyacc -v SznParser.mly
+ocamlc $FLAGS -c SznParser.mli
+ocamlc $FLAGS -c SznParser.ml
+
+ocamllex -q SznLexer.mll
+ocamlc $FLAGS -c SznLexer.ml
+
+ocamlc $FLAGS -c Szn2Cson.ml
+
+$LINKER $FLAGS -o szn2cson $DEPS Version.$EXT Util.$EXT ConfSolve.$EXT Debug.$EXT Parser.$EXT Lexer.$EXT CsonParser.$EXT CsonLexer.$EXT State.$EXT DeclBinding.$EXT  Counting.$EXT ExprBinding.$EXT Forward.$EXT TypeCheck.$EXT Blocks.$EXT Literals.$EXT CSON.$EXT SznSolution.$EXT SznParser.$EXT SznLexer.$EXT Szn2Cson.$EXT
+
+if [ $1 = "native" ]; then
+  strip szn2cson
+fi
+
+cp szn2cson ../bin
+
+#############
+
+# clean up
+cd .. rm -r .tmp
+
+echo success

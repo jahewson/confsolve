@@ -2,3 +2,4 @@
 bin
 tests/temp
 examples-todo
+.tmp
