@@ -334,38 +334,59 @@ let toMiniZinc model solution params paths showCounting hasComments noMinChangeC
   (* translates a class-member paramater *)
   and translateMemberParam cls (vname, t) state =
     output (cls.name  ^ "_" ^ vname);
-    match (params, paths) with
-    | (Some params, Some paths) ->
-        (match t with
-        | T_Class _
-        | T_Set (T_Class _, _, _) ->
-            (* constant *)
-            translateMemberVar cls (vname, t) state
-        | _ ->
-            let ccount = count cls.name state in
-            let mzn =
-            "array[1.." ^ string_of_int ccount ^ "] of " ^
-             translateType t state ^ ": " ^ cls.name ^ "_" ^ vname ^ " = [" ^
-              List.fold_left (fun mzn id ->
-                let path = StrIntMap.find (cls.name, id) paths in
-                (try
-                  let parent = CsonSolution.csonPathValue path params in
-                  (match parent with
-                  | CsonSolution.V_Object obj ->
-                      let delim = if String.length mzn = 0 then "" else ", " in
-                      let value = StrMap.find vname obj.CsonSolution.members in
-                      mzn ^ delim ^ csonToMz value paths params state
-                  | _ ->
-                      raise UnexpectedError)
-                 with Not_found ->
-                    output_string stderr ("Error: missing param: `" ^ vname ^ "` in class `" ^ cls.name ^ "`\n");
-                    exit 1)
-              ) "" (seq 1 (count (rootClass cls state.scope).name state))
-              ^ "]; /* param */\n"
-            in
-          (mzn, state))
-    | (_, _) ->
-        failwith "this model uses paramaters but the -p flag was not set"
+    let ccount = count cls.name state in
+    let (mzn, state) =
+      match (params, paths) with
+      | (Some params, Some paths) ->
+          (match t with
+          | T_Class _
+          | T_Set (T_Class _, _, _) ->
+              (* constant *)
+              translateMemberVar cls (vname, t) state
+          | _ ->
+              let ccount = count cls.name state in
+              let subclassIds = getSubclassIds cls.name state in
+              let mzn =
+              "array[1.." ^ string_of_int ccount ^ "] of " ^
+               translateType t state ^ ": " ^ cls.name ^ "_" ^ vname ^ " = [" ^
+                List.fold_left (fun mzn id ->
+                  (* is the object a subclass of the current class? 
+                     if not then it doesn't have this field, so we emit a placeholder *)
+  	              if not (List.exists (fun sub_id -> sub_id = id) subclassIds) then
+  	                let delim = if String.length mzn = 0 then "" else ", " in
+	                  (* because we want params to be const not var we just choose a default value *)
+	                  (* this also prevents symmetry *)
+	                  mzn ^ delim ^ "/*none*/" ^
+	                    match t with
+  	                  | T_Enum ename -> "1"
+                      | T_Bool -> "false"
+                      | T_Int -> "0"
+                      | T_BInt set -> string_of_int (IntSet.min_elt set)
+                      | T_Ref cname -> string_of_int (List.hd subclassIds)
+                      | T_Set (_, _, _) -> "{}"
+                      | _ -> failwith "not implemented"
+                  else
+                    let path = StrIntMap.find (cls.name, id) paths in
+                    (try
+                      let parent = CsonSolution.csonPathValue path params isQuiet in
+                      (match parent with
+                      | CsonSolution.V_Object obj ->
+                          let delim = if String.length mzn = 0 then "" else ", " in
+                          let value = StrMap.find vname obj.CsonSolution.members in
+                          mzn ^ delim ^ csonToMz value paths params state
+                      | _ ->
+                          raise UnexpectedError)
+                     with Not_found ->
+                        output_string stderr ("Error: missing param: `" ^ vname ^ "` in class `" ^ cls.name ^ "`\n");
+                        exit 1)
+                ) "" (seq 1 (count (rootClass cls state.scope).name state))
+                ^ "]; /* param */\n"
+              in
+            (mzn, state))
+      | (_, _) ->
+          failwith "this model uses parameters but the -p flag was not set"
+    in
+    oldMemberVar mzn ccount cls (vname, t) state
   
   (* translates a global variable *)
   and translateGlobalVar var state =
