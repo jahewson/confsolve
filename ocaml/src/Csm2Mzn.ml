@@ -70,8 +70,8 @@ let main () =
 		failwith "-i cannot be used without -m"
 	else ();
   if !showVersion then
-    (print_endline "(C) 2011-2012 The University Court of the University of Edinburgh";
-     print_endline ("Version 0.6 @ " ^ Version.sha);
+    (print_endline "(C) 2011-2013 The University Court of the University of Edinburgh";
+     print_endline ("Version 0.7 @ " ^ Version.sha);
     exit 0)
   else
     if String.length !filename = 0 then
