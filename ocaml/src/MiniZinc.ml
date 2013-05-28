@@ -309,25 +309,57 @@ let toMiniZinc model solution params paths showCounting hasComments noMinChangeC
           | None -> mzn
           | Some (globals, paths) ->
             (* get all objs by using ids 1..count in the path map, with cname *)
-            mzn ^ "array[1.." ^ string_of_int ccount ^ "] of var " ^
-             translateType t state ^ ": " ^ "old_" ^ cls.name ^ "_" ^ vname ^ " = [" ^
-              List.fold_left (fun mzn id ->
-                let path = StrIntMap.find (cls.name, id) paths in
+						let flags = ref [] in
+						let presentIdx = ref [] in
+						let hasAbsent = ref false in
+						let subclassIds = getSubclassIds cls.name state in
+						let mzn =
+							mzn ^ "array[1.." ^ string_of_int ccount ^ "] of var " ^
+	            translateType t state ^ ": " ^ "old_" ^ cls.name ^ "_" ^ vname ^ " = [" ^
+	             List.fold_left (fun mzn id ->
+	              let path =
+	                try
+	                  StrIntMap.find ((rootClass cls state.scope).name, id) paths
+								  with Not_found ->
+  								   failwith ("NOT FOUND: " ^ cls.name ^ " " ^ string_of_int id ^ "\n");
+  							in
 								let delim = if String.length mzn = 0 then "" else ", " in
 								try
-									let parent = CsonSolution.csonPathValue path globals in
+									let parent = CsonSolution.csonPathValue path globals isQuiet in
 	                match parent with
 	                | CsonSolution.V_Object obj ->
 	                    let value = StrMap.find vname obj.CsonSolution.members in
-	                    mzn ^ delim ^ csonToMz value paths globals state
+	                    let mzn = mzn ^ delim ^ csonToMz value paths globals state in
+											flags := (!flags) @ [true]; (* present *)
+											presentIdx := !presentIdx @ [id];
+											mzn
 	                | _ -> raise UnexpectedError
 								with _ ->
-                  if not isQuiet
+								  (* if we're not in quiet mode and the current object is a subclass of
+								     this class, then warn that the field is missing *)
+                  if (not isQuiet) && List.exists (fun sub_id -> sub_id = id) subclassIds
                     then output_string stderr ("Warning: missing solution variable: `" ^ vname ^ "` in class `" ^ cls.name ^ "`\n")
                     else ();
+                  flags := (!flags) @ [false]; (* absent *)
+                  hasAbsent := true;
 									mzn ^ delim ^ "_" (* _ is MiniZinc's anonymous variable *)
-              ) "" (seq 1 (count (rootClass cls state.scope).name state))
-            ^ "];\n" 
+	             ) "" (seq 1 (count (rootClass cls state.scope).name state))
+	           ^ "];\n"
+						in mzn ^
+						(* absent/present - adds a symmetry breaking constraint which guarantees that old/new values are equal *)
+						if !hasAbsent then
+							"\n% absent\n" ^
+								let (mzn, _) =
+									List.fold_left (fun (mzn, i) present ->
+										let mzn =
+											if not present then
+											 mzn ^ "constraint " ^ cls.name ^ "_" ^ vname ^ "[" ^ string_of_int i ^ "] = " ^
+												    "old_" ^ cls.name ^ "_" ^ vname ^ "[" ^ string_of_int i ^ "];\n"
+											else mzn
+										in (mzn, i + 1)
+									) ("", 1) !flags
+								in mzn
+						else ""
     in
     (mzn, state)
   
