@@ -17,13 +17,6 @@ fi
 # bin dir
 mkdir -p bin
 
-# copy examples/tests
-cd bin
-cp ../examples/*.csm* ./
-cp ../examples/reconfiguration/*.csm* ./
-cp ../tests/*.csm* ./
-cd ..
-
 # build in .tmp
 mkdir -p .tmp
 cd .tmp
