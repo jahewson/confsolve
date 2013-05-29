@@ -171,12 +171,7 @@ and mapVar id_cls (vname, t) state map path =
   | T_Class cname ->
       let (id, state) = newIndex cname state in
       let id = int_of_string id in
-      
-      let map = StrIntMap.add (cname, id) path map in
-      (*print_endline (cname ^ " " ^ string_of_int id ^ " -> " ^ path);*)
-      
-      let map = StrIntMap.add ((rootClass (resolveClass cname state.scope) state.scope).name, id) path map in
-      (*print_endline ((rootClass (resolveClass cname state.scope) state).name ^ " " ^ string_of_int id ^ " --> " ^ path);*)
+      let map = mapSuperclasses id cname state map path in
       
       mapObject id (resolveClass cname state.scope) state map path
       
@@ -185,12 +180,7 @@ and mapVar id_cls (vname, t) state map path =
       let (map, state, _) = List.fold_left (fun (map, state, i) id ->
         let id = int_of_string id in
         let path = path ^ "[" ^ string_of_int i ^ "]" in
-        
-        let map = StrIntMap.add (cname, id) path map in
-        (*print_endline (cname ^ " " ^ string_of_int id ^ " => " ^ path);*)
-        
-        let map = StrIntMap.add ((rootClass (resolveClass cname state.scope) state.scope).name, id) path map in
-        (*print_endline ((rootClass (resolveClass cname state.scope) state.scope).name ^ " " ^ string_of_int id ^ " ==> " ^ path);*)
+        let map = mapSuperclasses id cname state map path in
         
         let (map, state) = mapObject id (resolveClass cname state.scope) state map path in
         (map, state, i + 1)
@@ -199,6 +189,14 @@ and mapVar id_cls (vname, t) state map path =
       (map, state) 
       
   | _ -> (map, state)
+
+and mapSuperclasses id cname state map path =
+  let cls = resolveClass cname state.scope in
+  let map = StrIntMap.add (cls.name, id) path map in
+  (*print_endline (cname ^ " " ^ string_of_int id ^ " -> " ^ path);*)
+  match cls.super with
+  | Some cname -> mapSuperclasses id cname state map path
+  | None -> map
 
 let buildNameMapHelper model state =
   let (map, state) =

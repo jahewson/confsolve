@@ -1,15 +1,32 @@
-#!/bin/sh
+#!/bin/bash
 set -e
 
-cd bin
 rm -f temp.mzn
-echo "csm2mzn..."
-./csm2mzn $* > temp.mzn
-echo "mzn2fzn..."
+
+SCRIPT_DIR=`dirname $BASH_SOURCE`
+
+echo "* running csm2mzn" >&2
+set +e
+$SCRIPT_DIR/bin/csm2mzn $* > temp.mzn
+
+if [ $? -ne 0 ]; then
+  $SCRIPT_DIR/bin/csm2mzn $* >&2
+  exit 1
+fi
+set -e
+
+echo "* running mzn2fzn" >&2
 mzn2fzn --no-optimize temp.mzn
-echo "fz..."
+
+echo "* running fz" >&2
 fz -time 60000 -s temp.fzn > temp.szn
-echo "solns2out..."
+
+echo "* running solns2out" >&2
 solns2out temp.ozn temp.szn -o temp-out.szn
-echo "szn2cson..."
-./szn2cson $2 temp-out.szn
+
+echo "* running szn2cson" >&2
+echo "" >&2
+echo "Solution" >&2
+echo "--------" >&2
+$SCRIPT_DIR/bin/szn2cson $* temp-out.szn
+echo "" >&2
