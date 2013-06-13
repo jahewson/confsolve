@@ -6,7 +6,7 @@
 
 Before running ConfSolve, you will need to install:
 
-- Make (Windows users: [download](http://gnuwin32.sourceforge.net/packages/make.htm))
+- [Make](http://www.gnu.org/software/make/) (Windows users: [download](http://gnuwin32.sourceforge.net/packages/make.htm))
 
 - [OCaml](http://caml.inria.fr/download.en.html) binary distribution
 
@@ -22,62 +22,11 @@ Before running ConfSolve, you will need to install:
 
 ## Usage
 
-There are five stages to solving a ConfSolve model:
+Use the `solve` script to run the complete ConfSolve toolchain:
 
-### 1) csm2mzn
-Translates a ConfSolve model (csm) into a MiniZinc model (mzn) on `stdout`.
+    ./solve filename.csm
 
-    ocamlrun ./ocaml/bin/csm2mzn <filename.csm>
-    
-    usage: filename.csm [options]
-      -c  Comment generated MiniZinc
-      -m  Use the min-changes heuristic
-      -p filename.cson  Paramaters
-      -q  Quiet mode (no warnings)
-      -s filename.cson  Solution to re-configure
-
-In this case we pipe the output to `filename.mzn`:
-
-    ocamlrun ./ocaml/bin/csm2mzn filename.csm > filename.mzn
-
-
-### 2) mzn2fzn
-The MiniZinc is translated FlatZinc using the G12 MiniZinc translator:
-
-    mzn2fzn filename.mzn
-    
-This will generate a FlatZinc file `filename.fzn` and model description file `filename.ozn`.
-
-### 3) fz
-
-The FlatZinc model is solves using the Gecode constraint solver:
-
-    fz -s filename.fzn
-    
-This will generate a partial FlatZinc solution file `filename.szn`
-
-### 4) solns2out
-
-The FlatZinc solution is recombined with any constants from the original model:
-
-solns2out filename.ozn filename.szn -o filename-out.szn
-
-This will generate a full FlatZinc solution file `filename-out.fzn`
-
-### 5) szn2cson
-The FlatZinc solution file is converted into a ConfSolve solution file (CSON) using the original model:
-
-    ocamlrun ./ocaml/bin/szn2cson
-    
-    usage: filename.csm filename-out.szn [options]
-      -p filename.cson  Paramaters
-      --json  Output JSON instead of CSON
-
-In this case we run:
-
-     ocamlrun ./ocaml/bin/szn2cson filename.csm filename.szn
-     
-This generates `filename.cson`, which is a ConfSolve CSON solution.
+Alternatively, run each stage yourself using [these instructions on the wiki](https://github.com/jahewson/confsolve/wiki/Manually-running-the-ConfSolve-toolchain).
 
 ## License
 
